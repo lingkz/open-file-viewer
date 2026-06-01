@@ -1,0 +1,21 @@
+{
+  "name": "open-file-viewer-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Container-first file preview library for browser, React, Vue and vanilla JavaScript.",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "dev:vanilla": "pnpm --filter @open-file-viewer/example-vanilla dev",
+    "dev:react": "pnpm --filter @open-file-viewer/example-react dev",
+    "dev:vue": "pnpm --filter @open-file-viewer/example-vue dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "tsup": "^8.3.5",
+    "vite": "^6.0.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

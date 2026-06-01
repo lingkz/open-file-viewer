@@ -1,0 +1,44 @@
+{
+  "name": "@open-file-viewer/core",
+  "version": "0.1.0",
+  "description": "Framework-agnostic browser file preview core.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean && cp src/style.css dist/style.css",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependenciesMeta": {
+    "pdfjs-dist": {
+      "optional": true
+    }
+  },
+  "peerDependencies": {
+    "pdfjs-dist": ">=4"
+  },
+  "devDependencies": {
+    "@types/pako": "^2.0.4",
+    "@types/three": "^0.184.1",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "pako": "^2.1.0",
+    "three": "^0.184.0",
+    "xlsx": "^0.18.5"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@open-file-viewer/example-react",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@open-file-viewer/core": "workspace:*",
+    "@open-file-viewer/react": "workspace:*",
+    "@vitejs/plugin-react": "^4.3.4",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

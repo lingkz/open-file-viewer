@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open File Viewer Vanilla Demo</title>
+  </head>
+  <body>
+    <main class="demo-shell">
+      <aside class="demo-panel">
+        <h1>Open File Viewer</h1>
+        <input id="file" type="file" />
+        <label>
+          宽度
+          <input id="width" value="100%" />
+        </label>
+        <label>
+          高度
+          <input id="height" value="620px" />
+        </label>
+        <label>
+          适配
+          <select id="fit">
+            <option value="contain">contain</option>
+            <option value="cover">cover</option>
+            <option value="width">width</option>
+            <option value="actual">actual</option>
+            <option value="scale-down">scale-down</option>
+          </select>
+        </label>
+        <button id="apply">应用容器尺寸</button>
+      </aside>
+      <section id="viewer"></section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
