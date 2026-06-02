@@ -176,6 +176,9 @@ createViewer(options: PreviewOptions): FileViewer
 | `fit` | `PreviewFit` | `contain` | 内容适配方式 |
 | `plugins` | `PreviewPlugin[]` | `[]` | 预览插件列表 |
 | `fallback` | `inline \| download \| custom` | `inline` | 不支持时的兜底策略 |
+| `renderFallback` | `(ctx) => PreviewInstance` | - | `fallback: "custom"` 时的自定义兜底渲染 |
+| `toolbar` | `boolean \| PreviewToolbarOptions` | `false` | 显示下载、全屏、打印等基础工具栏 |
+| `theme` | `light \| dark \| auto` | `light` | 预览器主题 |
 | `onLoad` | `(file) => void` | - | 预览加载完成 |
 | `onError` | `(error, file) => void` | - | 预览失败 |
 | `onUnsupported` | `(file) => void` | - | 文件不支持 |
@@ -274,11 +277,11 @@ export function customPlugin(): PreviewPlugin {
 - [x] 文件 URL 预览
 - [x] 本地 File/Blob 预览
 - [x] ArrayBuffer 预览
-- [ ] 统一工具栏
-- [ ] 主题系统
-- [ ] 全屏预览
-- [ ] 打印
-- [ ] 搜索
+- [x] 基础工具栏
+- [x] 主题系统
+- [x] 全屏预览
+- [x] 打印
+- [x] 搜索
 - [ ] 多文件预览队列
 
 ### 图片
@@ -297,9 +300,9 @@ export function customPlugin(): PreviewPlugin {
 - [x] `apng`
 - [ ] `heic`
 - [ ] `heif`
-- [ ] 图片缩放工具栏
-- [ ] 图片旋转
-- [ ] 图片拖拽平移
+- [x] 图片缩放工具栏
+- [x] 图片旋转
+- [x] 图片拖拽平移
 
 ### 视频
 
@@ -342,7 +345,7 @@ export function customPlugin(): PreviewPlugin {
 - [ ] PDF 文本层
 - [ ] PDF 搜索
 - [ ] PDF 选择复制
-- [ ] `ofd` 基础文本和结构预览
+- [x] `ofd` 基础文本和结构预览
 - [ ] `ofd` 版式渲染
 - [ ] `xps`
 - [ ] `epub`

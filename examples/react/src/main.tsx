@@ -14,12 +14,14 @@ import {
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import { FileViewer } from "@open-file-viewer/react";
+import type { PreviewTheme } from "@open-file-viewer/react";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
 
 function App() {
+  const [theme, setTheme] = useState<PreviewTheme>("light");
   const [file, setFile] = useState<File | Blob>(
     new Blob(["React adapter demo\n\n选择本地文件后会在自定义容器内预览。"], {
       type: "text/plain"
@@ -56,8 +58,20 @@ function App() {
             }
           }}
         />
+        <select value={theme} onChange={(event) => setTheme(event.target.value as PreviewTheme)}>
+          <option value="light">light</option>
+          <option value="dark">dark</option>
+          <option value="auto">auto</option>
+        </select>
       </header>
-      <FileViewer file={file} fileName={file instanceof File ? file.name : "welcome.txt"} height="70vh" plugins={plugins} />
+      <FileViewer
+        file={file}
+        fileName={file instanceof File ? file.name : "welcome.txt"}
+        height="70vh"
+        plugins={plugins}
+        theme={theme}
+        toolbar
+      />
     </main>
   );
 }

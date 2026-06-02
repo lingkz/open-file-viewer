@@ -9,6 +9,7 @@ export type PreviewFit =
   | "scale-down";
 
 export type PreviewFallback = "inline" | "download" | "custom";
+export type PreviewTheme = "light" | "dark" | "auto";
 
 export interface PreviewFile {
   source: PreviewSource;
@@ -30,6 +31,8 @@ export interface PreviewToolbarOptions {
   rotate?: boolean;
   download?: boolean;
   fullscreen?: boolean;
+  print?: boolean;
+  search?: boolean;
 }
 
 export interface PreviewOptions {
@@ -42,7 +45,9 @@ export interface PreviewOptions {
   fit?: PreviewFit;
   plugins?: PreviewPlugin[];
   fallback?: PreviewFallback;
+  renderFallback?: (ctx: PreviewContext) => Promise<PreviewInstance> | PreviewInstance;
   toolbar?: boolean | PreviewToolbarOptions;
+  theme?: PreviewTheme;
   className?: string;
   onLoad?: (file: PreviewFile) => void;
   onError?: (error: Error, file?: PreviewFile) => void;

@@ -13,7 +13,8 @@ import {
   textPlugin,
   videoPlugin,
   type FileViewer,
-  type PreviewFit
+  type PreviewFit,
+  type PreviewTheme
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
@@ -24,6 +25,7 @@ const fileInput = document.querySelector<HTMLInputElement>("#file")!;
 const widthInput = document.querySelector<HTMLInputElement>("#width")!;
 const heightInput = document.querySelector<HTMLInputElement>("#height")!;
 const fitInput = document.querySelector<HTMLSelectElement>("#fit")!;
+const themeInput = document.querySelector<HTMLSelectElement>("#theme")!;
 const applyButton = document.querySelector<HTMLButtonElement>("#apply")!;
 
 let viewer: FileViewer | null = null;
@@ -43,6 +45,8 @@ function render() {
     width: widthInput.value,
     height: heightInput.value,
     fit: fitInput.value as PreviewFit,
+    theme: themeInput.value as PreviewTheme,
+    toolbar: true,
     plugins: [
       imagePlugin(),
       videoPlugin(),
@@ -73,5 +77,6 @@ fileInput.addEventListener("change", () => {
 });
 
 applyButton.addEventListener("click", render);
+themeInput.addEventListener("change", render);
 
 render();

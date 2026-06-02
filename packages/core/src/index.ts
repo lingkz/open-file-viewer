@@ -23,5 +23,6 @@ export type {
   PreviewPlugin,
   PreviewSize,
   PreviewSource,
+  PreviewTheme,
   PreviewToolbarOptions
 } from "./types";

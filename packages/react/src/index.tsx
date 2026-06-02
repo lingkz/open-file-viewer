@@ -1,5 +1,5 @@
 import { createViewer } from "@open-file-viewer/core";
-import type { FileViewer as CoreFileViewer, PreviewOptions } from "@open-file-viewer/core";
+import type { FileViewer as CoreFileViewer, PreviewOptions, PreviewTheme } from "@open-file-viewer/core";
 import type { CSSProperties } from "react";
 import { useEffect, useRef } from "react";
 
@@ -35,9 +35,18 @@ export function FileViewer({
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
-  }, [options.file, options.fileName, options.mimeType, width, height]);
+  }, [
+    options.file,
+    options.fileName,
+    options.mimeType,
+    options.fit,
+    options.toolbar,
+    options.theme,
+    width,
+    height
+  ]);
 
   return <div ref={containerRef} className={className} style={style} />;
 }
 
-export type { CoreFileViewer, PreviewOptions };
+export type { CoreFileViewer, PreviewOptions, PreviewTheme };

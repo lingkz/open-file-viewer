@@ -1,5 +1,5 @@
 import { createViewer } from "@open-file-viewer/core";
-import type { FileViewer, PreviewOptions, PreviewPlugin, PreviewSource } from "@open-file-viewer/core";
+import type { FileViewer, PreviewOptions, PreviewPlugin, PreviewSource, PreviewTheme } from "@open-file-viewer/core";
 import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropType } from "vue";
 
 export const OpenFileViewer = defineComponent({
@@ -26,6 +26,14 @@ export const OpenFileViewer = defineComponent({
     plugins: {
       type: Array as () => PreviewPlugin[],
       default: () => []
+    },
+    toolbar: {
+      type: [Boolean, Object] as PropType<PreviewOptions["toolbar"]>,
+      default: false
+    },
+    theme: {
+      type: String as PropType<PreviewOptions["theme"]>,
+      default: "light"
     }
   },
   setup(props) {
@@ -45,12 +53,23 @@ export const OpenFileViewer = defineComponent({
         width: props.width,
         height: props.height,
         fit: props.fit,
-        plugins: props.plugins
+        plugins: props.plugins,
+        toolbar: props.toolbar,
+        theme: props.theme
       });
     };
 
     watch(
-      () => [props.file, props.fileName, props.mimeType, props.width, props.height, props.fit],
+      () => [
+        props.file,
+        props.fileName,
+        props.mimeType,
+        props.width,
+        props.height,
+        props.fit,
+        props.toolbar,
+        props.theme
+      ],
       mount,
       { immediate: false }
     );
@@ -66,4 +85,4 @@ export const OpenFileViewer = defineComponent({
   }
 });
 
-export type { FileViewer, PreviewOptions, PreviewPlugin, PreviewSource };
+export type { FileViewer, PreviewOptions, PreviewPlugin, PreviewSource, PreviewTheme };

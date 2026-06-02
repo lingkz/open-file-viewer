@@ -33,7 +33,13 @@ const extensionMimeMap: Record<string, string> = {
   yml: "text/yaml",
   csv: "text/csv",
   md: "text/markdown",
-  markdown: "text/markdown"
+  markdown: "text/markdown",
+  toml: "text/plain",
+  ini: "text/plain",
+  scss: "text/css",
+  less: "text/css",
+  mjs: "text/javascript",
+  cjs: "text/javascript"
 };
 
 export async function normalizeFile(
@@ -110,13 +116,19 @@ export function isTextLike(file: PreviewFile): boolean {
       "md",
       "markdown",
       "js",
+      "mjs",
+      "cjs",
       "ts",
       "tsx",
       "jsx",
       "vue",
       "css",
+      "scss",
+      "less",
       "html",
       "htm",
+      "toml",
+      "ini",
       "java",
       "py",
       "go",

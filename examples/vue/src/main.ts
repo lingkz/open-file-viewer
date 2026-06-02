@@ -15,6 +15,7 @@ import {
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import { OpenFileViewer } from "@open-file-viewer/vue";
+import type { PreviewTheme } from "@open-file-viewer/vue";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
 import "./style.css";
 
@@ -26,6 +27,7 @@ const App = {
         type: "text/plain"
       })
     );
+    const theme = ref<PreviewTheme>("light");
     const plugins = [
       imagePlugin(),
       videoPlugin(),
@@ -41,7 +43,7 @@ const App = {
       textPlugin()
     ];
 
-    return { file, plugins };
+    return { file, plugins, theme };
   },
   template: `
     <main class="demo-shell">
@@ -54,8 +56,13 @@ const App = {
             if (next) file = next
           }"
         />
+        <select v-model="theme">
+          <option value="light">light</option>
+          <option value="dark">dark</option>
+          <option value="auto">auto</option>
+        </select>
       </header>
-      <OpenFileViewer :file="file" :file-name="file.name || 'welcome.txt'" height="70vh" :plugins="plugins" />
+      <OpenFileViewer :file="file" :file-name="file.name || 'welcome.txt'" height="70vh" :plugins="plugins" :theme="theme" toolbar />
     </main>
   `
 };
