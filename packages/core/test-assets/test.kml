@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Test Placemarks</name>
+    <Placemark>
+      <name>Eiffel Tower</name>
+      <description>Famous landmark in Paris</description>
+      <Point>
+        <coordinates>2.2945,48.8584,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Seine River segment</name>
+      <LineString>
+        <coordinates>
+          2.2912,48.8612,0
+          2.2980,48.8570,0
+          2.3050,48.8590,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>

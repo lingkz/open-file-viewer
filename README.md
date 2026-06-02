@@ -300,8 +300,8 @@ export function customPlugin(): PreviewPlugin {
 - [x] `tif`
 - [x] `tiff`
 - [x] `apng`
-- [ ] `heic`
-- [ ] `heif`
+- [x] `heic`
+- [x] `heif`
 - [x] 图片缩放工具栏
 - [x] 图片旋转
 - [x] 图片拖拽平移
@@ -314,15 +314,15 @@ export function customPlugin(): PreviewPlugin {
 - [x] `ogv`
 - [x] `mov`
 - [x] `m4v`
-- [ ] `avi`
-- [ ] `mkv`
-- [ ] `flv`
-- [ ] `wmv`
-- [ ] `3gp`
-- [ ] `ts`
-- [ ] `m3u8`
-- [ ] HLS 播放增强
-- [ ] 视频转码 fallback
+- [x] `avi`
+- [x] `mkv`
+- [x] `flv`
+- [x] `wmv`
+- [x] `3gp`
+- [x] `ts`
+- [x] `m3u8`
+- [x] HLS 播放增强
+- [x] 视频转码 fallback
 
 ### 音频
 
@@ -343,7 +343,7 @@ export function customPlugin(): PreviewPlugin {
 - [x] `pdf`
 - [x] PDF.js worker 配置
 - [x] PDF 按容器宽度自适应渲染
-- [ ] PDF 分页虚拟滚动
+- [x] PDF 分页虚拟滚动
 - [ ] PDF 文本层
 - [ ] PDF 搜索
 - [ ] PDF 选择复制
@@ -433,8 +433,8 @@ export function customPlugin(): PreviewPlugin {
 - [x] `sh`
 - [x] `diff`
 - [x] `patch`
-- [ ] Markdown 渲染增强
-- [ ] 代码高亮
+- [x] Markdown 渲染增强
+- [x] 代码高亮
 - [ ] Monaco 代码预览
 
 ### CAD / 图纸
@@ -468,10 +468,10 @@ export function customPlugin(): PreviewPlugin {
 
 - [x] `eml` 邮件头和正文基础预览
 - [x] `mbox` 基础文本预览
-- [ ] `msg`
-- [ ] 邮件 HTML 正文解析
-- [ ] 邮件附件列表
-- [ ] 邮件内嵌图片
+- [x] `msg`
+- [x] 邮件 HTML 正文解析
+- [x] 邮件附件列表
+- [x] 邮件内嵌图片
 
 ### 绘图 / 白板
 
@@ -485,24 +485,24 @@ export function customPlugin(): PreviewPlugin {
 ### 压缩包
 
 - [x] `zip` 目录预览
-- [ ] `rar`
-- [ ] `7z`
-- [ ] `tar`
-- [ ] `gz`
-- [ ] `tgz`
-- [ ] `bz2`
-- [ ] `xz`
-- [ ] 压缩包内文件联动预览
-- [ ] 加密压缩包提示
+- [x] `rar`
+- [x] `7z`
+- [x] `tar`
+- [x] `gz`
+- [x] `tgz`
+- [x] `bz2`
+- [x] `xz`
+- [x] 压缩包内文件联动预览
+- [x] 加密压缩包提示
 
 ### GIS / 地图数据
 
-- [ ] `geojson`
-- [ ] `topojson`
-- [ ] `kml`
-- [ ] `kmz`
-- [ ] `gpx`
-- [ ] `shp`
+- [x] `geojson`
+- [x] `topojson`
+- [x] `kml`
+- [x] `kmz`
+- [x] `gpx`
+- [x] `shp`
 
 ## 建议支持范围
 

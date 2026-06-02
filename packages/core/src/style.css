@@ -410,37 +410,14 @@
   background: var(--ofv-surface);
 }
 
-.ofv-slide-stage {
-  position: relative;
-  width: min(100%, 960px);
-  min-height: auto;
-  margin: 0 auto;
-  padding: 0;
-  overflow: hidden;
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
-}
-
-.ofv-slide-element {
-  position: absolute;
-  overflow: hidden;
-}
-
-.ofv-slide-text {
-  display: flex;
-  align-items: flex-start;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: clamp(10px, 1.8vw, 18px);
-  line-height: 1.25;
-}
-
-.ofv-slide-picture img {
+.ofv-pptx-viewer {
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  min-height: 160px;
+  overflow: auto;
+  background: var(--ofv-bg);
 }
+
+
 
 .ofv-slide-image {
   margin: 12px 0 0;
@@ -501,3 +478,476 @@
   width: 100%;
   height: 100%;
 }
+
+/* Archive / Zip layout styling */
+.ofv-archive-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--ofv-surface);
+  min-height: 360px;
+}
+
+.ofv-archive-sidebar {
+  width: 320px;
+  flex: 0 0 320px;
+  border-right: 1px solid var(--ofv-border);
+  display: flex;
+  flex-direction: column;
+  background: var(--ofv-surface-muted);
+}
+
+.ofv-archive-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ofv-border);
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--ofv-text);
+  background: var(--ofv-surface);
+}
+
+.ofv-archive-tree {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ofv-archive-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  position: relative;
+  background: var(--ofv-bg);
+}
+
+.ofv-archive-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ofv-text);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  user-select: none;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.ofv-archive-item:hover {
+  background: var(--ofv-button-hover);
+}
+
+.ofv-archive-item.is-active {
+  background: var(--ofv-button-hover);
+  font-weight: bold;
+  border-left: 3px solid var(--ofv-text);
+  padding-left: 13px;
+}
+
+.ofv-archive-item-icon {
+  flex: 0 0 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.ofv-archive-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ofv-archive-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--ofv-text-muted);
+  font-size: 14px;
+  gap: 12px;
+}
+
+.ofv-archive-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--ofv-border);
+  border-top-color: var(--ofv-text);
+  border-radius: 50%;
+  animation: ofv-spin 1s linear infinite;
+}
+
+@keyframes ofv-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ofv-archive-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px;
+  color: var(--ofv-text);
+  max-width: 600px;
+  margin: auto;
+}
+
+.ofv-archive-info h3 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  border-bottom: 1px solid var(--ofv-border);
+  padding-bottom: 8px;
+}
+
+.ofv-archive-info-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 14px;
+}
+
+/* Email specific styles */
+.ofv-email-attachments {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ofv-email-attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--ofv-surface-muted);
+  border: 1px solid var(--ofv-border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ofv-text);
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ofv-email-attachment-item:hover {
+  background: var(--ofv-button-hover);
+  border-color: var(--ofv-text-muted);
+}
+
+.ofv-email-body-iframe {
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: inset 0 0 2px rgba(0,0,0,0.05);
+}
+
+/* GIS / Map Visualization Styles */
+.ofv-map-stage {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--ofv-bg);
+  min-height: 360px;
+}
+
+/* Premium custom Leaflet map controls styling */
+.ofv-map-stage .leaflet-bar {
+  border: 1px solid var(--ofv-border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.ofv-map-stage .leaflet-bar a {
+  background-color: var(--ofv-surface) !important;
+  color: var(--ofv-text) !important;
+  border-bottom: 1px solid var(--ofv-border) !important;
+}
+
+.ofv-map-stage .leaflet-bar a:hover {
+  background-color: var(--ofv-button-hover) !important;
+}
+
+/* Elegant feature popup table styling */
+.ofv-map-popup {
+  font-family: inherit;
+  color: var(--ofv-text);
+  max-width: 280px;
+}
+
+.ofv-map-popup h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--ofv-border);
+  padding-bottom: 4px;
+}
+
+.ofv-map-popup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ofv-map-popup-table tr {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.ofv-map-popup-table tr:last-child {
+  border-bottom: none;
+}
+
+.ofv-map-popup-key {
+  font-weight: 600;
+  color: var(--ofv-text-muted);
+  padding: 4px 8px 4px 0;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.ofv-map-popup-val {
+  padding: 4px 0;
+  word-break: break-word;
+}
+
+/* Code container styling */
+.ofv-code-container {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: var(--ofv-surface-muted);
+}
+
+.ofv-code-container pre {
+  margin: 0;
+  padding: 24px;
+  background: transparent !important;
+  font-family: var(--ofv-font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Markdown container styling */
+.ofv-markdown-body {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 32px;
+  box-sizing: border-box;
+  background: var(--ofv-surface);
+  color: var(--ofv-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 15px;
+  line-height: 1.65;
+  word-wrap: break-word;
+}
+
+/* Light / Dark adjustments for Markdown */
+.ofv-root.ofv-theme-dark .ofv-markdown-body {
+  background: var(--ofv-surface-muted);
+}
+
+.ofv-markdown-body h1,
+.ofv-markdown-body h2,
+.ofv-markdown-body h3,
+.ofv-markdown-body h4,
+.ofv-markdown-body h5,
+.ofv-markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ofv-text);
+}
+
+.ofv-markdown-body h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid var(--ofv-border); }
+.ofv-markdown-body h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid var(--ofv-border); }
+.ofv-markdown-body h3 { font-size: 1.25em; }
+.ofv-markdown-body h4 { font-size: 1em; }
+
+.ofv-markdown-body p,
+.ofv-markdown-body blockquote,
+.ofv-markdown-body ul,
+.ofv-markdown-body ol,
+.ofv-markdown-body dl,
+.ofv-markdown-body table,
+.ofv-markdown-body pre {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.ofv-markdown-body a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.ofv-markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.ofv-root.ofv-theme-dark .ofv-markdown-body a {
+  color: #60a5fa;
+}
+
+.ofv-markdown-body blockquote {
+  padding: 0 1em;
+  color: var(--ofv-text-muted);
+  border-left: .25em solid var(--ofv-border);
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.ofv-markdown-body ul,
+.ofv-markdown-body ol {
+  padding-left: 2em;
+}
+
+.ofv-markdown-body ul {
+  list-style-type: disc;
+}
+
+.ofv-markdown-body ol {
+  list-style-type: decimal;
+}
+
+.ofv-markdown-body li + li {
+  margin-top: .25em;
+}
+
+.ofv-markdown-body code {
+  padding: .2em .4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: var(--ofv-surface-muted);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.ofv-root.ofv-theme-dark .ofv-markdown-body code {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.ofv-markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: var(--ofv-surface-muted);
+  border-radius: 6px;
+}
+
+.ofv-root.ofv-theme-dark .ofv-markdown-body pre {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.ofv-markdown-body pre code {
+  padding: 0;
+  margin: 0;
+  font-size: 100%;
+  word-break: normal;
+  white-space: pre;
+  background: transparent !important;
+  border: 0;
+}
+
+.ofv-markdown-body hr {
+  height: .25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: var(--ofv-border);
+  border: 0;
+}
+
+.ofv-markdown-body table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ofv-markdown-body table th,
+.ofv-markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid var(--ofv-border);
+}
+
+.ofv-markdown-body table tr {
+  background-color: var(--ofv-surface);
+}
+
+.ofv-markdown-body table tr:nth-child(2n) {
+  background-color: var(--ofv-surface-muted);
+}
+
+/* PDF lazy loading elements */
+.ofv-pdf-page-wrapper {
+  margin: 16px auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--ofv-border);
+  background-color: var(--ofv-surface);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.ofv-pdf-skeleton {
+  font-size: 14px;
+  color: var(--ofv-text-muted);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ofv-surface-muted) 25%, var(--ofv-border) 37%, var(--ofv-surface-muted) 63%);
+  background-size: 400% 100%;
+  animation: ofv-skeleton-pulse 1.4s ease infinite;
+}
+
+@keyframes ofv-skeleton-pulse {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.ofv-pdf-error {
+  color: #ef4444;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* PDF Text Layer styling */
+.ofv-pdf-text-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.ofv-pdf-text-layer span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  pointer-events: auto;
+}
+
+.ofv-pdf-text-layer span::selection {
+  background: rgba(59, 130, 246, 0.35); /* Premium blue highlight matching theme */
+}
+
+/* For Firefox support of selection background */
+.ofv-pdf-text-layer span::-moz-selection {
+  background: rgba(59, 130, 246, 0.35);
+}
+
+
+
+

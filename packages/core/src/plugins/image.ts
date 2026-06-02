@@ -1,3 +1,4 @@
+/// <reference path="../shims-heic.d.ts" />
 import { createObjectUrl, revokeObjectUrl } from "../dom";
 import type { PreviewPlugin, PreviewSize } from "../types";
 
@@ -24,9 +25,52 @@ export function imagePlugin(): PreviewPlugin {
     match(file) {
       return file.mimeType.startsWith("image/") || imageExtensions.has(file.extension);
     },
-    render(ctx) {
-      const url = createObjectUrl(ctx.file);
-      const isExternal = Boolean(ctx.file.url);
+    async render(ctx) {
+      const ext = ctx.file.extension.toLowerCase();
+      const isHeic = ext === "heic" || ext === "heif";
+
+      let url = "";
+      let convertedBlob: Blob | null = null;
+      let isExternal = Boolean(ctx.file.url);
+
+      if (isHeic) {
+        ctx.setLoading(true);
+        try {
+          let blob = ctx.file.blob;
+          if (!blob && typeof ctx.file.source === "string") {
+            const res = await fetch(ctx.file.source);
+            if (!res.ok) {
+              throw new Error(`Failed to fetch HEIC file: ${res.status}`);
+            }
+            blob = await res.blob();
+          }
+          if (!blob) {
+            throw new Error("HEIC file source cannot be resolved to a Blob.");
+          }
+
+          const heic2anyModule = await import("heic2any");
+          const heic2any = heic2anyModule.default || heic2anyModule;
+          const converted = await heic2any({
+            blob,
+            toType: "image/jpeg",
+            quality: 0.8
+          });
+
+          convertedBlob = Array.isArray(converted) ? converted[0] : converted;
+          url = URL.createObjectURL(convertedBlob);
+          isExternal = false;
+        } catch (err: any) {
+          console.error("HEIC image conversion failed:", err);
+          // Fallback to raw object URL
+          url = createObjectUrl(ctx.file);
+          isExternal = Boolean(ctx.file.url);
+        } finally {
+          ctx.setLoading(false);
+        }
+      } else {
+        url = createObjectUrl(ctx.file);
+      }
+
       const wrapper = document.createElement("div");
       wrapper.className = "ofv-image-viewer";
 
@@ -160,7 +204,11 @@ export function imagePlugin(): PreviewPlugin {
           stage.removeEventListener("pointercancel", onPointerUp);
           stage.removeEventListener("wheel", onWheel);
           wrapper.remove();
-          revokeObjectUrl(url, isExternal);
+          if (convertedBlob) {
+            URL.revokeObjectURL(url);
+          } else {
+            revokeObjectUrl(url, isExternal);
+          }
         }
       };
     }

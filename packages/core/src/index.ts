@@ -11,6 +11,7 @@ export { emailPlugin } from "./plugins/email";
 export { drawingPlugin } from "./plugins/drawing";
 export { cadPlugin } from "./plugins/cad";
 export { model3dPlugin } from "./plugins/model3d";
+export { gisPlugin } from "./plugins/gis";
 export { fallbackPlugin } from "./plugins/fallback";
 export type {
   FileViewer,

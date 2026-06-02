@@ -7,6 +7,7 @@ import {
   emailPlugin,
   imagePlugin,
   model3dPlugin,
+  gisPlugin,
   officePlugin,
   ofdPlugin,
   pdfPlugin,
@@ -62,6 +63,7 @@ function render() {
       drawingPlugin(),
       cadPlugin(),
       model3dPlugin(),
+      gisPlugin(),
       textPlugin()
     ],
     onError(error) {

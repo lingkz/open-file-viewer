@@ -37,9 +37,14 @@ const extensionMimeMap: Record<string, string> = {
   toml: "text/plain",
   ini: "text/plain",
   scss: "text/css",
-  less: "text/css",
   mjs: "text/javascript",
-  cjs: "text/javascript"
+  cjs: "text/javascript",
+  geojson: "application/geo+json",
+  topojson: "application/json",
+  kml: "application/vnd.google-earth.kml+xml",
+  kmz: "application/vnd.google-earth.kmz",
+  gpx: "application/gpx+xml",
+  shp: "application/octet-stream"
 };
 
 export async function normalizeFile(

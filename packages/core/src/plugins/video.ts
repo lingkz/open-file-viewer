@@ -23,19 +23,100 @@ export function videoPlugin(): PreviewPlugin {
     match(file) {
       return file.mimeType.startsWith("video/") || videoExtensions.has(file.extension);
     },
-    render(ctx) {
+    async render(ctx) {
       const url = createObjectUrl(ctx.file);
       const isExternal = Boolean(ctx.file.url);
+      
+      const container = document.createElement("div");
+      container.className = "ofv-video-container";
+      container.style.cssText = "width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;";
+
       const video = document.createElement("video");
       video.className = "ofv-media";
-      video.src = url;
       video.controls = true;
       video.playsInline = true;
       video.preload = "metadata";
       video.style.objectFit = ctx.options.fit === "cover" ? "cover" : "contain";
-
+      
+      container.append(video);
       ctx.viewport.classList.add("ofv-center");
-      ctx.viewport.append(video);
+      ctx.viewport.append(container);
+
+      let hlsInstance: any = null;
+      let mpegtsPlayer: any = null;
+
+      const showTranscodeFallback = () => {
+        video.style.display = "none";
+        video.pause();
+        
+        // Remove any existing fallback UI first
+        const oldFallback = container.querySelector(".ofv-fallback");
+        if (oldFallback) {
+          oldFallback.remove();
+        }
+
+        const fallback = document.createElement("div");
+        fallback.className = "ofv-fallback";
+        
+        const title = document.createElement("strong");
+        title.textContent = `当前浏览器不支持直接播放该视频格式 (.${ctx.file.extension.toUpperCase()})`;
+        
+        const meta = document.createElement("span");
+        meta.textContent = "建议转换为 MP4 格式播放，或直接下载在本地播放。";
+        
+        const download = document.createElement("a");
+        download.href = url;
+        download.download = ctx.file.name;
+        download.textContent = "下载视频";
+        
+        fallback.append(title, meta, download);
+        container.append(fallback);
+      };
+
+      video.addEventListener("error", () => {
+        showTranscodeFallback();
+      });
+
+      try {
+        const ext = ctx.file.extension.toLowerCase();
+        if (ext === "m3u8") {
+          const Hls = (await import("hls.js")).default;
+          if (Hls.isSupported()) {
+            hlsInstance = new Hls();
+            hlsInstance.loadSource(url);
+            hlsInstance.attachMedia(video);
+            hlsInstance.on(Hls.Events.ERROR, (_event: any, data: any) => {
+              if (data.fatal) {
+                showTranscodeFallback();
+              }
+            });
+          } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            video.src = url;
+          } else {
+            showTranscodeFallback();
+          }
+        } else if (ext === "flv" || ext === "ts") {
+          const mpegts = (await import("mpegts.js")).default;
+          if (mpegts.isSupported()) {
+            mpegtsPlayer = mpegts.createPlayer({
+              type: ext === "flv" ? "flv" : "mpegts",
+              url: url
+            });
+            mpegtsPlayer.attachMediaElement(video);
+            mpegtsPlayer.load();
+            mpegtsPlayer.on(mpegts.Events.ERROR, () => {
+              showTranscodeFallback();
+            });
+          } else {
+            showTranscodeFallback();
+          }
+        } else {
+          // Native playback for mp4, webm, mov, ogg, etc.
+          video.src = url;
+        }
+      } catch (err) {
+        showTranscodeFallback();
+      }
 
       return {
         resize() {
@@ -44,8 +125,18 @@ export function videoPlugin(): PreviewPlugin {
         },
         destroy() {
           video.pause();
+          
+          if (hlsInstance) {
+            hlsInstance.destroy();
+          }
+          if (mpegtsPlayer) {
+            mpegtsPlayer.unload();
+            mpegtsPlayer.destroy();
+          }
+
           ctx.viewport.classList.remove("ofv-center");
           revokeObjectUrl(url, isExternal);
+          container.remove();
         }
       };
     }

@@ -469,7 +469,47 @@ function printPreview(viewport: HTMLElement): void {
 
   const clone = viewport.cloneNode(true) as HTMLElement;
   copyCanvasContent(viewport, clone);
-  clone.classList.add("ofv-print-root");
+  clone.classList.add("ofv-print-root", "ofv-root"); // Add ofv-root class so CSS variables can resolve
+
+  // Handle PPTX printing layout adaptation
+  const pptxViewer = clone.querySelector(".ofv-pptx-viewer") || (clone.classList.contains("ofv-pptx-viewer") ? clone : null);
+  let intrinsicWidth = 960;
+  let intrinsicHeight = 540;
+  let hasSlides = false;
+
+  if (pptxViewer) {
+    const slides = pptxViewer.querySelectorAll("[data-slide-index]");
+    if (slides.length > 0) {
+      hasSlides = true;
+      const firstWrapper = slides[0].firstElementChild as HTMLElement | null;
+      const firstSlide = firstWrapper?.firstElementChild as HTMLElement | null;
+      if (firstSlide) {
+        intrinsicWidth = parseInt(firstSlide.style.width) || 960;
+        intrinsicHeight = parseInt(firstSlide.style.height) || 540;
+      }
+
+      slides.forEach((slideEl) => {
+        const item = slideEl as HTMLElement;
+        item.style.width = "100%";
+        item.style.margin = "0 0 20px 0";
+
+        const wrapper = item.firstElementChild as HTMLElement | null;
+        if (wrapper) {
+          wrapper.style.width = `${intrinsicWidth}px`;
+          wrapper.style.height = `${intrinsicHeight}px`;
+          wrapper.style.boxShadow = "none";
+          wrapper.style.margin = "0 auto";
+
+          const slideContent = wrapper.firstElementChild as HTMLElement | null;
+          if (slideContent) {
+            slideContent.style.transform = "none";
+            slideContent.style.width = `${intrinsicWidth}px`;
+            slideContent.style.height = `${intrinsicHeight}px`;
+          }
+        }
+      });
+    }
+  }
 
   const doc = frame.contentDocument;
   if (!doc) {
@@ -477,64 +517,122 @@ function printPreview(viewport: HTMLElement): void {
     return;
   }
 
+  // 1. Write the basic HTML skeleton
   doc.open();
   doc.write(`<!doctype html>
     <html>
       <head>
         <meta charset="utf-8" />
         <title>Print preview</title>
-        <style>
-          * { box-sizing: border-box; }
-          html, body {
-            margin: 0;
-            padding: 0;
-            background: #fff;
-            color: #111827;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          }
-          body { padding: 16px; }
-          img, video, canvas, svg { max-width: 100%; }
-          pre {
-            white-space: pre-wrap;
-            word-break: break-word;
-            font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-          }
-          .ofv-viewport, .ofv-print-root {
-            width: 100%;
-            height: auto;
-            overflow: visible;
-            background: #fff;
-            color: #111827;
-          }
-          .ofv-pdf {
-            padding: 0;
-            overflow: visible;
-            background: #fff;
-          }
-          .ofv-pdf-page {
-            display: block;
-            max-width: 100%;
-            height: auto;
-            margin: 0 auto 16px;
-            box-shadow: none;
-          }
-          .ofv-panel,
-          .ofv-text,
-          .ofv-text-block,
-          .ofv-file-list {
-            max-height: none;
-            min-height: 0;
-            overflow: visible;
-          }
-          .ofv-section {
-            break-inside: avoid;
-            page-break-inside: avoid;
-          }
-        </style>
       </head>
       <body></body>
     </html>`);
   doc.close();
+
+  // 2. Copy all stylesheets from parent document to print iframe
+  Array.from(document.querySelectorAll("style, link[rel='stylesheet']")).forEach((el) => {
+    doc.head.appendChild(el.cloneNode(true));
+  });
+
+  // 3. Inject our base print style override element AFTER parent stylesheets
+  const baseStyle = doc.createElement("style");
+  baseStyle.textContent = `
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #111827;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body { padding: 16px; }
+    img, video, canvas, svg { max-width: 100%; }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .ofv-viewport, .ofv-print-root {
+      width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+      background: #fff !important;
+      color: #111827 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .ofv-pdf {
+      padding: 0;
+      overflow: visible;
+      background: #fff;
+    }
+    .ofv-pdf-page {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto 16px;
+      box-shadow: none;
+    }
+    .ofv-panel,
+    .ofv-text,
+    .ofv-text-block,
+    .ofv-file-list {
+      max-height: none;
+      min-height: 0;
+      overflow: visible;
+    }
+    .ofv-section {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+  `;
+  doc.head.appendChild(baseStyle);
+
+  // 4. Inject PPTX-specific style overrides if slides are present
+  if (hasSlides) {
+    const pptxStyle = doc.createElement("style");
+    pptxStyle.textContent = `
+      @media print {
+        @page {
+          size: ${intrinsicWidth > intrinsicHeight ? "landscape" : "portrait"};
+          margin: 0;
+        }
+        html, body {
+          background: #fff;
+        }
+        body {
+          width: ${intrinsicWidth}px !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .ofv-print-root {
+          width: ${intrinsicWidth}px !important;
+          padding: 0 !important;
+        }
+        .ofv-pptx-viewer {
+          width: ${intrinsicWidth}px !important;
+          padding: 0 !important;
+          background: #fff !important;
+          overflow: visible !important;
+        }
+        .ofv-pptx-viewer > div[data-slide-index] {
+          page-break-after: always;
+          break-after: page;
+          break-inside: avoid;
+          page-break-inside: avoid;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+        }
+        .ofv-pptx-viewer > div[data-slide-index]:last-child {
+          page-break-after: avoid;
+          break-after: avoid;
+        }
+      }
+    `;
+    doc.head.appendChild(pptxStyle);
+  }
+
   doc.body.append(clone);
 
   let printed = false;

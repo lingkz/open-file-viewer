@@ -1,0 +1,36 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Central Park",
+        "city": "New York",
+        "area": "3.41 km²"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-73.981845, 40.768076],
+            [-73.974807, 40.764953],
+            [-73.949701, 40.796853],
+            [-73.956711, 40.800533],
+            [-73.981845, 40.768076]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Empire State Building",
+        "height": "443m"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9857, 40.7484]
+      }
+    }
+  ]
+}

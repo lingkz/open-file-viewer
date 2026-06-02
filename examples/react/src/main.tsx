@@ -6,6 +6,7 @@ import {
   emailPlugin,
   imagePlugin,
   model3dPlugin,
+  gisPlugin,
   officePlugin,
   ofdPlugin,
   pdfPlugin,
@@ -40,6 +41,7 @@ function App() {
       drawingPlugin(),
       cadPlugin(),
       model3dPlugin(),
+      gisPlugin(),
       textPlugin()
     ],
     []

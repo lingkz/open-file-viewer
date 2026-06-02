@@ -7,6 +7,7 @@ import {
   emailPlugin,
   imagePlugin,
   model3dPlugin,
+  gisPlugin,
   officePlugin,
   ofdPlugin,
   pdfPlugin,
@@ -40,6 +41,7 @@ const App = {
       drawingPlugin(),
       cadPlugin(),
       model3dPlugin(),
+      gisPlugin(),
       textPlugin()
     ];
 
