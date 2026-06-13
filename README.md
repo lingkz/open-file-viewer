@@ -344,9 +344,9 @@ export function customPlugin(): PreviewPlugin {
 - [x] PDF.js worker 配置
 - [x] PDF 按容器宽度自适应渲染
 - [x] PDF 分页虚拟滚动
-- [ ] PDF 文本层
-- [ ] PDF 搜索
-- [ ] PDF 选择复制
+- [x] PDF 文本层
+- [x] PDF 搜索
+- [x] PDF 选择复制
 - [x] `ofd` 基础文本和结构预览
 - [ ] `ofd` 版式渲染
 - [ ] `xps`
@@ -379,8 +379,8 @@ export function customPlugin(): PreviewPlugin {
 - [ ] `fods`
 - [ ] `numbers`
 - [ ] `et`
-- [ ] 表格冻结行列
-- [ ] 表格公式展示
+- [x] 表格冻结行列
+- [x] 表格公式展示
 - [ ] 表格图表预览
 - [ ] 大表格虚拟滚动
 
@@ -446,8 +446,8 @@ export function customPlugin(): PreviewPlugin {
 - [ ] `stp`
 - [ ] `iges`
 - [ ] `igs`
-- [ ] DXF 更多图元
-- [ ] 图纸缩放和平移工具
+- [x] DXF 更多图元
+- [x] 图纸缩放工具
 - [ ] 图层开关
 
 ### 3D 模型

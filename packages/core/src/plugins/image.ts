@@ -190,6 +190,31 @@ export function imagePlugin(): PreviewPlugin {
       updateTransform();
 
       return {
+        command(command) {
+          if (command === "zoom-in") {
+            setScale(scale + 0.25);
+            return true;
+          }
+          if (command === "zoom-out") {
+            setScale(scale - 0.25);
+            return true;
+          }
+          if (command === "zoom-reset") {
+            reset();
+            return true;
+          }
+          if (command === "rotate-right") {
+            rotation = (rotation + 90) % 360;
+            updateTransform();
+            return true;
+          }
+          if (command === "rotate-left") {
+            rotation = (rotation - 90) % 360;
+            updateTransform();
+            return true;
+          }
+          return false;
+        },
         resize(size: PreviewSize) {
           image.style.maxWidth = `${size.width}px`;
           image.style.maxHeight = `${Math.max(0, size.height - controls.offsetHeight)}px`;

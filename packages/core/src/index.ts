@@ -15,6 +15,7 @@ export { gisPlugin } from "./plugins/gis";
 export { fallbackPlugin } from "./plugins/fallback";
 export type {
   FileViewer,
+  PreviewCommand,
   PreviewContext,
   PreviewFallback,
   PreviewFile,

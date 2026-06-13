@@ -59,6 +59,8 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
       }> = [];
 
       let observer: IntersectionObserver | null = null;
+      let currentSize = ctx.size;
+      let zoomFactor = 1;
 
       // Cancel page rendering and free canvas memory
       const clearPage = (pageIdx: number) => {
@@ -92,8 +94,8 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
           const meta = pagesMeta[pageIdx];
           const scale =
             ctx.options.fit === "actual"
-              ? 1
-              : Math.max(0.1, Math.min(3, (size.width - 32) / meta.width));
+              ? zoomFactor
+              : Math.max(0.1, Math.min(5, ((size.width - 32) / meta.width) * zoomFactor));
           
           const viewport = page.getViewport({ scale });
 
@@ -194,8 +196,8 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
           const meta = pagesMeta[i];
           const scale =
             ctx.options.fit === "actual"
-              ? 1
-              : Math.max(0.1, Math.min(3, (size.width - 32) / meta.width));
+              ? zoomFactor
+              : Math.max(0.1, Math.min(5, ((size.width - 32) / meta.width) * zoomFactor));
           
           const w = Math.floor(meta.width * scale);
           const h = Math.floor(meta.height * scale);
@@ -223,7 +225,26 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
 
       let resizeTimer: number | undefined;
       return {
+        command(command) {
+          if (command === "zoom-in") {
+            zoomFactor = Math.min(4, zoomFactor + 0.15);
+            renderLayout(currentSize);
+            return true;
+          }
+          if (command === "zoom-out") {
+            zoomFactor = Math.max(0.25, zoomFactor - 0.15);
+            renderLayout(currentSize);
+            return true;
+          }
+          if (command === "zoom-reset") {
+            zoomFactor = 1;
+            renderLayout(currentSize);
+            return true;
+          }
+          return false;
+        },
         resize(size) {
+          currentSize = size;
           window.clearTimeout(resizeTimer);
           resizeTimer = window.setTimeout(() => {
             renderLayout(size);

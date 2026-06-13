@@ -4,6 +4,7 @@ import { fallbackPlugin } from "./plugins/fallback";
 import type {
   FileViewer,
   PreviewFile,
+  PreviewCommand,
   PreviewInstance,
   PreviewItem,
   PreviewOptions,
@@ -34,6 +35,7 @@ export function createViewer(options: PreviewOptions): FileViewer {
 
   const queue = normalizeQueue(options);
   let currentIndex = clampIndex(options.initialIndex || 0, queue.length);
+  let currentInstance: PreviewInstance | undefined;
 
   const goTo = async (index: number) => {
     if (destroyed || queue.length === 0) {
@@ -46,7 +48,8 @@ export function createViewer(options: PreviewOptions): FileViewer {
   const toolbar = createToolbar(options.toolbar, viewport, {
     getLength: () => queue.length,
     next: () => goTo(currentIndex + 1),
-    previous: () => goTo(currentIndex - 1)
+    previous: () => goTo(currentIndex - 1),
+    command: (command) => currentInstance?.command?.(command)
   });
   if (toolbar) {
     host.append(toolbar.element);
@@ -61,7 +64,6 @@ export function createViewer(options: PreviewOptions): FileViewer {
     ...options
   };
 
-  let currentInstance: PreviewInstance | undefined;
   let destroyed = false;
   let renderToken = 0;
 
@@ -116,6 +118,7 @@ export function createViewer(options: PreviewOptions): FileViewer {
       }
       currentInstance = nextInstance;
       setLoading(false);
+      toolbar?.setCommandSupport(Boolean(nextInstance.command));
       options.onLoad?.(file);
       resize();
     } catch (error) {
@@ -246,11 +249,13 @@ function createToolbar(
     getLength: () => number;
     next: () => void | Promise<void>;
     previous: () => void | Promise<void>;
+    command: (command: PreviewCommand) => void | boolean | undefined;
   }
 ):
   | {
       element: HTMLElement;
       update: (file: PreviewFile, index: number, length: number) => void;
+      setCommandSupport: (supported: boolean) => void;
       destroy: () => void;
     }
   | undefined {
@@ -260,7 +265,7 @@ function createToolbar(
 
   const options: PreviewToolbarOptions =
     typeof toolbar === "boolean"
-      ? { download: true, fullscreen: true, print: true, search: true }
+      ? { zoom: true, rotate: true, download: true, fullscreen: true, print: true, search: true }
       : toolbar;
 
   const element = document.createElement("div");
@@ -272,18 +277,23 @@ function createToolbar(
   let queueLabel: HTMLSpanElement | undefined;
   let previousButton: HTMLButtonElement | undefined;
   let nextButton: HTMLButtonElement | undefined;
+  const commandButtons: HTMLButtonElement[] = [];
   const disposers: Array<() => void> = [];
   const search = createSearchController(viewport);
 
-  const addButton = (label: string, title: string, action: () => void) => {
+  const addButton = (label: string, title: string, action: () => void, className?: string) => {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = label;
     button.title = title;
     button.setAttribute("aria-label", title);
+    if (className) {
+      button.className = className;
+    }
     button.addEventListener("click", action);
     element.append(button);
     disposers.push(() => button.removeEventListener("click", action));
+    return button;
   };
 
   const addQueueButton = (label: string, title: string, action: () => void | Promise<void>) => {
@@ -307,6 +317,24 @@ function createToolbar(
     queueLabel = document.createElement("span");
     queueLabel.className = "ofv-toolbar-queue";
     element.append(queueLabel);
+  }
+
+  const addCommandButton = (label: string, title: string, command: PreviewCommand) => {
+    const button = addButton(label, title, () => {
+      queue.command(command);
+    });
+    button.disabled = true;
+    commandButtons.push(button);
+  };
+
+  if (options.zoom) {
+    addCommandButton("-", "Zoom out", "zoom-out");
+    addCommandButton("+", "Zoom in", "zoom-in");
+    addCommandButton("100%", "Reset zoom", "zoom-reset");
+  }
+
+  if (options.rotate) {
+    addCommandButton("Rotate", "Rotate right", "rotate-right");
   }
 
   if (options.download !== false) {
@@ -357,6 +385,9 @@ function createToolbar(
     update(nextFile, index, length) {
       file = nextFile;
       search.clear();
+      commandButtons.forEach((button) => {
+        button.disabled = true;
+      });
       if (queueLabel) {
         queueLabel.textContent = `${index + 1} / ${length}`;
       }
@@ -366,6 +397,11 @@ function createToolbar(
       if (nextButton) {
         nextButton.disabled = index >= length - 1;
       }
+    },
+    setCommandSupport(supported) {
+      commandButtons.forEach((button) => {
+        button.disabled = !supported;
+      });
     },
     destroy() {
       search.clear();

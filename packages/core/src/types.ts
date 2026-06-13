@@ -74,8 +74,11 @@ export interface PreviewContext {
 
 export interface PreviewInstance {
   resize?: (size: PreviewSize) => void;
+  command?: (command: PreviewCommand) => void | boolean;
   destroy: () => void;
 }
+
+export type PreviewCommand = "zoom-in" | "zoom-out" | "zoom-reset" | "rotate-right" | "rotate-left";
 
 export interface PreviewPlugin {
   name: string;

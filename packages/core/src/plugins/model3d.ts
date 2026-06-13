@@ -38,9 +38,16 @@ export function model3dPlugin(): PreviewPlugin {
       scene.add(directional);
       scene.add(new THREE.GridHelper(10, 10, 0xcbd5e1, 0xe5e7eb));
 
-      const object = await loadModel(ctx.file.extension, url, THREE);
+      const loaded = await loadModel(ctx.file.extension, url, THREE);
+      if (loaded.message) {
+        const message = document.createElement("div");
+        message.className = "ofv-model-message";
+        message.textContent = loaded.message;
+        stage.append(message);
+      }
+      const object = loaded.object;
       scene.add(object);
-      frameObject(object, camera, controls, THREE);
+      const initialFrame = frameObject(object, camera, controls, THREE);
 
       let animationFrame = 0;
       const animate = () => {
@@ -60,6 +67,29 @@ export function model3dPlugin(): PreviewPlugin {
       resize(ctx.size);
 
       return {
+        command(command) {
+          if (command === "zoom-in" || command === "zoom-out") {
+            const factor = command === "zoom-in" ? 0.82 : 1.18;
+            camera.position.sub(controls.target).multiplyScalar(factor).add(controls.target);
+            camera.updateProjectionMatrix();
+            controls.update();
+            return true;
+          }
+          if (command === "zoom-reset") {
+            camera.position.copy(initialFrame.cameraPosition);
+            controls.target.copy(initialFrame.target);
+            camera.near = initialFrame.near;
+            camera.far = initialFrame.far;
+            camera.updateProjectionMatrix();
+            controls.update();
+            return true;
+          }
+          if (command === "rotate-right" || command === "rotate-left") {
+            object.rotateY(command === "rotate-right" ? Math.PI / 8 : -Math.PI / 8);
+            return true;
+          }
+          return false;
+        },
         resize,
         destroy() {
           window.cancelAnimationFrame(animationFrame);
@@ -74,29 +104,35 @@ export function model3dPlugin(): PreviewPlugin {
   };
 }
 
-async function loadModel(extension: string, url: string, THREE: typeof import("three")) {
+async function loadModel(
+  extension: string,
+  url: string,
+  THREE: typeof import("three")
+): Promise<{ object: import("three").Object3D; message?: string }> {
   if (extension === "gltf" || extension === "glb") {
     const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
     const gltf = await new GLTFLoader().loadAsync(url);
-    return gltf.scene;
+    return { object: gltf.scene };
   }
   if (extension === "obj") {
     const { OBJLoader } = await import("three/examples/jsm/loaders/OBJLoader.js");
-    return new OBJLoader().loadAsync(url);
+    return { object: await new OBJLoader().loadAsync(url) };
   }
   if (extension === "stl") {
     const { STLLoader } = await import("three/examples/jsm/loaders/STLLoader.js");
     const geometry = await new STLLoader().loadAsync(url);
     const material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.55 });
-    return new THREE.Mesh(geometry, material);
+    return { object: new THREE.Mesh(geometry, material) };
   }
   const group = new THREE.Group();
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const material = new THREE.MeshStandardMaterial({ color: 0x64748b });
   const mesh = new THREE.Mesh(geometry, material);
   group.add(mesh);
-  group.userData["ofvUnsupported"] = `.${extension} 已识别为 3D 格式，当前内置渲染优先支持 gltf/glb/obj/stl。`;
-  return group;
+  return {
+    object: group,
+    message: `.${extension} 已识别为 3D 格式，当前内置渲染优先支持 gltf/glb/obj/stl。`
+  };
 }
 
 function frameObject(
@@ -104,7 +140,12 @@ function frameObject(
   camera: import("three").PerspectiveCamera,
   controls: { target: import("three").Vector3; update: () => void },
   THREE: typeof import("three")
-): void {
+): {
+  cameraPosition: import("three").Vector3;
+  target: import("three").Vector3;
+  near: number;
+  far: number;
+} {
   const box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
@@ -116,6 +157,12 @@ function frameObject(
   camera.updateProjectionMatrix();
   controls.target.copy(center);
   controls.update();
+  return {
+    cameraPosition: camera.position.clone(),
+    target: controls.target.clone(),
+    near: camera.near,
+    far: camera.far
+  };
 }
 
 function disposeObject(object: import("three").Object3D, THREE: typeof import("three")): void {

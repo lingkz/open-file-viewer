@@ -32,6 +32,7 @@ const extensionMimeMap: Record<string, string> = {
   yaml: "text/yaml",
   yml: "text/yaml",
   csv: "text/csv",
+  tsv: "text/tab-separated-values",
   md: "text/markdown",
   markdown: "text/markdown",
   toml: "text/plain",

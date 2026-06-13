@@ -160,17 +160,53 @@ async function renderSheet(
   tabs.className = "ofv-tabs";
   const content = document.createElement("div");
   content.className = "ofv-sheet";
+  const buttons = new Map<string, HTMLButtonElement>();
 
   const renderSheetByName = (sheetName: string) => {
     content.replaceChildren();
+    buttons.forEach((button, name) => {
+      button.classList.toggle("is-active", name === sheetName);
+    });
+
     const heading = document.createElement("h3");
     heading.textContent = sheetName;
     const sheet = workbook.Sheets[sheetName];
+    const range = xlsx.utils.decode_range(sheet["!ref"] || "A1:A1");
+    const rowCount = range.e.r - range.s.r + 1;
+    const columnCount = range.e.c - range.s.c + 1;
+    const formulaRows = collectFormulaRows(sheet, range, xlsx.utils.encode_cell);
+
+    const summary = document.createElement("div");
+    summary.className = "ofv-sheet-summary";
+    summary.textContent = `${rowCount} 行 x ${columnCount} 列${
+      formulaRows.length > 0 ? `，包含 ${formulaRows.length} 个公式单元格` : ""
+    }`;
+
     const html = xlsx.utils.sheet_to_html(sheet, { id: `ofv-sheet-${sheetName}` });
     const tableWrapper = document.createElement("div");
     tableWrapper.className = "ofv-table-scroll";
     tableWrapper.innerHTML = html;
-    content.append(heading, tableWrapper);
+    annotateSheetTable(tableWrapper, range, formulaRows);
+    content.append(heading, summary, tableWrapper);
+
+    if (formulaRows.length > 0) {
+      const details = document.createElement("details");
+      details.className = "ofv-details ofv-formula-list";
+      details.innerHTML = `<summary>公式明细</summary>`;
+      const list = document.createElement("ul");
+      for (const item of formulaRows.slice(0, 200)) {
+        const row = document.createElement("li");
+        row.textContent = `${item.address}: ${item.formula}`;
+        list.append(row);
+      }
+      if (formulaRows.length > 200) {
+        const row = document.createElement("li");
+        row.textContent = `还有 ${formulaRows.length - 200} 个公式未展示。`;
+        list.append(row);
+      }
+      details.append(list);
+      content.append(details);
+    }
   };
 
   if (workbook.SheetNames.length === 0) {
@@ -181,6 +217,7 @@ async function renderSheet(
       button.type = "button";
       button.textContent = sheetName;
       button.addEventListener("click", () => renderSheetByName(sheetName));
+      buttons.set(sheetName, button);
       tabs.append(button);
       if (index === 0) {
         renderSheetByName(sheetName);
@@ -189,6 +226,60 @@ async function renderSheet(
   }
 
   panel.append(tabs, content);
+}
+
+function collectFormulaRows(
+  sheet: Record<string, any>,
+  range: { s: { r: number; c: number }; e: { r: number; c: number } },
+  encodeCell: (cell: { r: number; c: number }) => string
+): Array<{ address: string; formula: string }> {
+  const formulas: Array<{ address: string; formula: string }> = [];
+  for (let row = range.s.r; row <= range.e.r; row += 1) {
+    for (let column = range.s.c; column <= range.e.c; column += 1) {
+      const address = encodeCell({ r: row, c: column });
+      const cell = sheet[address];
+      if (cell?.f) {
+        formulas.push({ address, formula: `=${cell.f}` });
+      }
+    }
+  }
+  return formulas;
+}
+
+function annotateSheetTable(
+  tableWrapper: HTMLElement,
+  range: { s: { r: number; c: number } },
+  formulas: Array<{ address: string; formula: string }>
+): void {
+  const table = tableWrapper.querySelector("table");
+  if (!table) {
+    return;
+  }
+
+  const formulaMap = new Map(formulas.map((item) => [item.address, item.formula]));
+  const rows = Array.from(table.rows);
+  rows.forEach((row, rowIndex) => {
+    Array.from(row.cells).forEach((cell, columnIndex) => {
+      const address = encodeA1(rowIndex + range.s.r, columnIndex + range.s.c);
+      cell.dataset.cell = address;
+      const formula = formulaMap.get(address);
+      if (formula) {
+        cell.classList.add("ofv-cell-formula");
+        cell.title = formula;
+      }
+    });
+  });
+}
+
+function encodeA1(rowIndex: number, columnIndex: number): string {
+  let column = "";
+  let value = columnIndex + 1;
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    column = String.fromCharCode(65 + remainder) + column;
+    value = Math.floor((value - 1) / 26);
+  }
+  return `${column}${rowIndex + 1}`;
 }
 
 async function renderPptx(panel: HTMLElement, arrayBuffer: ArrayBuffer): Promise<void> {
