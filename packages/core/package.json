@@ -12,7 +12,9 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": {
+      "default": "./dist/style.css"
+    }
   },
   "files": [
     "dist"
@@ -42,6 +44,8 @@
     "@aiden0z/pptx-renderer": "^1.0.3",
     "@kenjiuno/msgreader": "^1.28.0",
     "@mapbox/togeojson": "^0.16.2",
+    "docx-preview": "^0.3.7",
+    "dompurify": "^3.4.10",
     "heic2any": "^0.0.4",
     "hls.js": "^1.6.16",
     "jszip": "^3.10.1",

@@ -75,6 +75,7 @@ export interface PreviewContext {
 export interface PreviewInstance {
   resize?: (size: PreviewSize) => void;
   command?: (command: PreviewCommand) => void | boolean;
+  canCommand?: (command: PreviewCommand) => boolean;
   destroy: () => void;
 }
 

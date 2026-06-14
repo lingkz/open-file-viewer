@@ -38,9 +38,23 @@ export const OpenFileViewer = defineComponent({
     theme: {
       type: String as PropType<PreviewOptions["theme"]>,
       default: "light"
-    }
+    },
+    fallback: {
+      type: String as PropType<PreviewOptions["fallback"]>,
+      default: "inline"
+    },
+    renderFallback: Function as PropType<PreviewOptions["renderFallback"]>,
+    className: String,
+    onLoad: Function as PropType<PreviewOptions["onLoad"]>,
+    onError: Function as PropType<PreviewOptions["onError"]>,
+    onUnsupported: Function as PropType<PreviewOptions["onUnsupported"]>
   },
-  setup(props) {
+  emits: {
+    load: (_file: unknown) => true,
+    error: (_error: Error, _file?: unknown) => true,
+    unsupported: (_file: unknown) => true
+  },
+  setup(props, { emit }) {
     const containerRef = ref<HTMLElement | null>(null);
     let viewer: FileViewer | null = null;
 
@@ -60,7 +74,28 @@ export const OpenFileViewer = defineComponent({
         fit: props.fit,
         plugins: props.plugins,
         toolbar: props.toolbar,
-        theme: props.theme
+        theme: props.theme,
+        fallback: props.fallback,
+        renderFallback: props.renderFallback,
+        className: props.className,
+        onLoad(file) {
+          props.onLoad?.(file);
+          if (!props.onLoad) {
+            emit("load", file);
+          }
+        },
+        onError(error, file) {
+          props.onError?.(error, file);
+          if (!props.onError) {
+            emit("error", error, file);
+          }
+        },
+        onUnsupported(file) {
+          props.onUnsupported?.(file);
+          if (!props.onUnsupported) {
+            emit("unsupported", file);
+          }
+        }
       });
     };
 
@@ -73,8 +108,15 @@ export const OpenFileViewer = defineComponent({
         props.width,
         props.height,
         props.fit,
+        props.plugins,
+        props.fallback,
+        props.renderFallback,
         props.toolbar,
-        props.theme
+        props.theme,
+        props.className,
+        props.onLoad,
+        props.onError,
+        props.onUnsupported
       ],
       mount,
       { immediate: false }
@@ -87,7 +129,7 @@ export const OpenFileViewer = defineComponent({
       viewer = null;
     });
 
-    return () => h("div", { ref: containerRef });
+    return () => h("div", { ref: containerRef, class: props.className });
   }
 });
 

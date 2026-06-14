@@ -1,8 +1,15 @@
+import DOMPurify from "dompurify";
 import type { PreviewPlugin } from "../types";
-import { appendMeta, createPanel, createSection, readArrayBuffer, readTextFile, escapeHtml } from "./utils";
+import { appendMeta, createPanel, createSection, readArrayBuffer, readTextFile, resolveFormat } from "./utils";
 import { createObjectUrl, revokeObjectUrl } from "../dom";
 
 const emailExtensions = new Set(["eml", "msg", "mbox"]);
+const emailMimeTypes = new Set(["message/rfc822", "application/vnd.ms-outlook", "application/mbox"]);
+const emailMimeFormatMap: Record<string, string> = {
+  "message/rfc822": "eml",
+  "application/vnd.ms-outlook": "msg",
+  "application/mbox": "mbox"
+};
 
 interface EmailAttachment {
   name: string;
@@ -26,7 +33,7 @@ export function emailPlugin(): PreviewPlugin {
   return {
     name: "email",
     match(file) {
-      return emailExtensions.has(file.extension);
+      return emailExtensions.has(file.extension) || emailMimeTypes.has(file.mimeType);
     },
     async render(ctx) {
       const panel = createPanel("ofv-email");
@@ -34,9 +41,11 @@ export function emailPlugin(): PreviewPlugin {
 
       const url = createObjectUrl(ctx.file);
       const isExternal = Boolean(ctx.file.url);
-      const ext = ctx.file.extension.toLowerCase();
+      const ext = resolveFormat(ctx.file, emailMimeFormatMap).toLowerCase();
       let emailData: EmailData;
       const objectUrlsToRevoke: string[] = [];
+      const attachmentObjectUrls = new Map<EmailAttachment, string>();
+      const timersToClear: number[] = [];
 
       try {
         if (ext === "msg") {
@@ -151,18 +160,17 @@ export function emailPlugin(): PreviewPlugin {
           container.className = "ofv-email-attachments";
 
           emailData.attachments.forEach((att) => {
-            const blob = new Blob([att.content as BlobPart], { type: att.mimeType });
-            const blobUrl = URL.createObjectURL(blob);
-            objectUrlsToRevoke.push(blobUrl);
+            const blobUrl = getAttachmentObjectUrl(att, attachmentObjectUrls, objectUrlsToRevoke);
 
             const item = document.createElement("a");
             item.className = "ofv-email-attachment-item";
             item.href = blobUrl;
             item.download = att.name;
+            item.rel = "noopener noreferrer";
             
             // Format attachment size helper
             const sizeKB = Math.round(att.content.byteLength / 1024);
-            item.innerHTML = `📎 ${escapeHtml(att.name)} (${sizeKB} KB)`;
+            item.textContent = `Attachment: ${att.name} (${sizeKB} KB)`;
             container.append(item);
           });
           
@@ -177,28 +185,26 @@ export function emailPlugin(): PreviewPlugin {
         let html = emailData.bodyHtml;
         if (html) {
           // Replace inline cid: content IDs with local blob URLs
+          let nextHtml = html;
           emailData.attachments.forEach((att) => {
-            if (att.contentId) {
-              const blob = new Blob([att.content as BlobPart], { type: att.mimeType });
-              const blobUrl = URL.createObjectURL(blob);
-              objectUrlsToRevoke.push(blobUrl);
+            const contentId = att.contentId;
+            if (contentId) {
+              const blobUrl = getAttachmentObjectUrl(att, attachmentObjectUrls, objectUrlsToRevoke);
 
-              const cleanCid = att.contentId.replace(/[<>]/g, "");
-              const cidRegexes = [
-                new RegExp(`cid:${att.contentId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g"),
-                new RegExp(`cid:${cleanCid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g")
-              ];
-              
-              cidRegexes.forEach((regex) => {
-                html = html!.replace(regex, blobUrl);
-              });
+              const cleanCid = contentId.replace(/[<>]/g, "");
+              nextHtml = replaceCidResourceUrls(nextHtml, contentId, blobUrl);
+              if (cleanCid !== contentId) {
+                nextHtml = replaceCidResourceUrls(nextHtml, cleanCid, blobUrl);
+              }
             }
           });
+          html = nextHtml;
+          const sanitizedHtml = sanitizeEmailHtml(html);
 
           // Render in a sandboxed iframe to prevent styles leaking
           const iframe = document.createElement("iframe");
           iframe.className = "ofv-email-body-iframe";
-          iframe.sandbox.add("allow-popups", "allow-popups-to-escape-sandbox");
+          iframe.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
           iframe.style.cssText = "width: 100%; border: none; background: #fff; min-height: 200px;";
           bodySection.append(iframe);
 
@@ -231,10 +237,11 @@ export function emailPlugin(): PreviewPlugin {
                         }
                       </style>
                     </head>
-                    <body>${html}</body>
+                    <body>${sanitizedHtml}</body>
                   </html>
                 `);
                 idoc.close();
+                secureEmailLinks(idoc);
 
                 // Auto-adjust height to avoid double scrolling
                 const resize = () => {
@@ -251,8 +258,8 @@ export function emailPlugin(): PreviewPlugin {
                 };
 
                 resize();
-                window.setTimeout(resize, 300);
-                window.setTimeout(resize, 1000);
+                timersToClear.push(window.setTimeout(resize, 300));
+                timersToClear.push(window.setTimeout(resize, 1000));
               }
             } catch (err) {
               console.error("Failed to write html body to email iframe:", err);
@@ -267,7 +274,7 @@ export function emailPlugin(): PreviewPlugin {
         }
 
       } catch (err: any) {
-        panel.innerHTML = "";
+        panel.replaceChildren();
         const errorSection = createSection("邮件解析出错");
         const pre = document.createElement("pre");
         pre.className = "ofv-text-block";
@@ -279,6 +286,7 @@ export function emailPlugin(): PreviewPlugin {
 
       return {
         destroy() {
+          timersToClear.forEach((timer) => window.clearTimeout(timer));
           objectUrlsToRevoke.forEach((u) => {
             URL.revokeObjectURL(u);
           });
@@ -288,6 +296,34 @@ export function emailPlugin(): PreviewPlugin {
       };
     }
   };
+}
+
+function getAttachmentObjectUrl(
+  attachment: EmailAttachment,
+  cache: Map<EmailAttachment, string>,
+  urlsToRevoke: string[]
+): string {
+  const cached = cache.get(attachment);
+  if (cached) {
+    return cached;
+  }
+  const blob = new Blob([attachment.content as BlobPart], { type: attachment.mimeType });
+  const url = URL.createObjectURL(blob);
+  cache.set(attachment, url);
+  urlsToRevoke.push(url);
+  return url;
+}
+
+function replaceCidResourceUrls(html: string, contentId: string, blobUrl: string): string {
+  const escapedCid = escapeRegExp(contentId);
+  return html.replace(
+    new RegExp(`\\b(src|poster|background)=(["'])cid:${escapedCid}\\2`, "gi"),
+    (_match, attribute: string, quote: string) => `${attribute}=${quote}${blobUrl}${quote}`
+  );
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // Helper to convert MBOX format to first EML message text
@@ -334,4 +370,40 @@ function getMimeType(name: string): string {
     wav: "audio/wav"
   };
   return ext ? map[ext] || "application/octet-stream" : "application/octet-stream";
+}
+
+function sanitizeEmailHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: ["target"],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|blob|cid):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+  });
+}
+
+function secureEmailLinks(document: Document): void {
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("a[href]")) {
+    const href = link.getAttribute("href") || "";
+    if (!isSafeEmailHref(href)) {
+      link.removeAttribute("href");
+      link.removeAttribute("target");
+      link.removeAttribute("rel");
+      continue;
+    }
+    if (/^(https?:)?\/\//i.test(href)) {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
+  }
+}
+
+function isSafeEmailHref(href: string): boolean {
+  const trimmed = href.trim();
+  return (
+    trimmed.startsWith("#") ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("./") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("blob:") ||
+    /^(https?:|mailto:|tel:)/i.test(trimmed)
+  );
 }

@@ -3,9 +3,33 @@ import pako from "pako";
 import type { PreviewPlugin, PreviewFile } from "../types";
 import { fallbackPlugin } from "./fallback";
 import { createObjectUrl, revokeObjectUrl } from "../dom";
-import { appendMeta, createPanel, createSection, readArrayBuffer } from "./utils";
+import { appendMeta, createPanel, createSection, readArrayBuffer, resolveFormat } from "./utils";
 
 const archiveExtensions = new Set(["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"]);
+const archiveMimeTypes = new Set([
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "application/x-tar",
+  "application/gzip",
+  "application/x-gzip",
+  "application/x-bzip2",
+  "application/x-xz"
+]);
+const archiveMimeFormatMap: Record<string, string> = {
+  "application/zip": "zip",
+  "application/x-zip-compressed": "zip",
+  "application/vnd.rar": "rar",
+  "application/x-rar-compressed": "rar",
+  "application/x-7z-compressed": "7z",
+  "application/x-tar": "tar",
+  "application/gzip": "gz",
+  "application/x-gzip": "gz",
+  "application/x-bzip2": "bz2",
+  "application/x-xz": "xz"
+};
 
 interface ArchiveEntry {
   name: string;
@@ -18,7 +42,7 @@ export function archivePlugin(): PreviewPlugin {
   return {
     name: "archive",
     match(file) {
-      return archiveExtensions.has(file.extension);
+      return archiveExtensions.has(file.extension) || archiveMimeTypes.has(file.mimeType);
     },
     async render(ctx) {
       const url = createObjectUrl(ctx.file);
@@ -26,7 +50,7 @@ export function archivePlugin(): PreviewPlugin {
       const panel = createPanel("ofv-archive");
       ctx.viewport.append(panel);
 
-      const ext = ctx.file.extension.toLowerCase();
+      const ext = resolveFormat(ctx.file, archiveMimeFormatMap).toLowerCase();
       let archiveEntries: ArchiveEntry[] = [];
       let isEncrypted = false;
       let parseError: string | null = null;
@@ -93,7 +117,7 @@ export function archivePlugin(): PreviewPlugin {
         fallback.className = "ofv-fallback";
         
         const title = document.createElement("strong");
-        title.innerHTML = "🔒 该压缩包已被加密保护";
+        title.textContent = "该压缩包已被加密保护";
         
         const meta = document.createElement("span");
         meta.textContent = "为了您的数据安全，本预览器不支持直接在线解密。请下载文件后在本地输入密码解压。";
@@ -171,7 +195,7 @@ export function archivePlugin(): PreviewPlugin {
 
       // Render default metadata summary
       const showDefaultSummary = () => {
-        mainPanel.innerHTML = "";
+        mainPanel.replaceChildren();
         const summary = document.createElement("div");
         summary.className = "ofv-archive-info";
         
@@ -184,12 +208,10 @@ export function archivePlugin(): PreviewPlugin {
         const fileCount = archiveEntries.filter(e => !e.dir).length;
         const dirCount = archiveEntries.filter(e => e.dir).length;
         
-        info.innerHTML = `
-          <div><strong>格式类型：</strong>.${ext.toUpperCase()} 压缩文件</div>
-          <div><strong>包含文件数：</strong>${fileCount} 个</div>
-          <div><strong>包含目录数：</strong>${dirCount} 个</div>
-          <div><strong>操作提示：</strong>请点击左侧栏中的文件进行联动预览。</div>
-        `;
+        appendArchiveInfo(info, "格式类型", `.${ext.toUpperCase()} 压缩文件`);
+        appendArchiveInfo(info, "包含文件数", `${fileCount} 个`);
+        appendArchiveInfo(info, "包含目录数", `${dirCount} 个`);
+        appendArchiveInfo(info, "操作提示", "请点击左侧栏中的文件进行联动预览。");
         
         summary.append(heading, info);
         mainPanel.append(summary);
@@ -199,10 +221,14 @@ export function archivePlugin(): PreviewPlugin {
 
       // Filter and render items (max 500 to keep DOM lightweight)
       const visibleEntries = archiveEntries.filter(e => !e.dir).slice(0, 500);
+      let destroyed = false;
+      let renderToken = 0;
 
       visibleEntries.forEach((entry) => {
-        const item = document.createElement("div");
+        const item = document.createElement("button");
         item.className = "ofv-archive-item";
+        item.type = "button";
+        item.title = entry.name;
 
         const icon = document.createElement("span");
         icon.className = "ofv-archive-item-icon";
@@ -217,9 +243,17 @@ export function archivePlugin(): PreviewPlugin {
         tree.append(item);
 
         item.addEventListener("click", async () => {
+          if (destroyed) {
+            return;
+          }
+          const token = ++renderToken;
           // Highlight active item
-          sidebar.querySelectorAll(".ofv-archive-item").forEach((el) => el.classList.remove("is-active"));
+          sidebar.querySelectorAll(".ofv-archive-item").forEach((el) => {
+            el.classList.remove("is-active");
+            el.removeAttribute("aria-current");
+          });
           item.classList.add("is-active");
+          item.setAttribute("aria-current", "true");
 
           // Cleanup previous sub-preview
           if (currentSubInstance) {
@@ -228,15 +262,13 @@ export function archivePlugin(): PreviewPlugin {
           }
 
           // Show loading state
-          mainPanel.innerHTML = `
-            <div class="ofv-archive-loading">
-              <div class="ofv-archive-loading-spinner"></div>
-              <span>正在解压并加载 [${entry.name.split("/").pop()}]...</span>
-            </div>
-          `;
+          mainPanel.replaceChildren(createArchiveLoading(entry.name.split("/").pop() || entry.name));
 
           try {
             let buffer = await entry.read();
+            if (destroyed || token !== renderToken) {
+              return;
+            }
             const subName = entry.name.split("/").pop() || entry.name;
             const subExt = subName.split(".").pop()?.toLowerCase() || "";
             const subMime = getMimeType(subName);
@@ -263,6 +295,9 @@ export function archivePlugin(): PreviewPlugin {
                   newZip.file(prjEntry.name.split("/").pop()!, await prjEntry.read());
                 }
                 buffer = await newZip.generateAsync({ type: "arraybuffer" });
+                if (destroyed || token !== renderToken) {
+                  return;
+                }
               }
             }
 
@@ -275,38 +310,71 @@ export function archivePlugin(): PreviewPlugin {
             subViewport.style.cssText = "flex: 1; width: 100%; height: 100%; position: relative; overflow: auto;";
             subContainer.append(subViewport);
 
+            const blob = new Blob([buffer], { type: subMime });
             const subFile: PreviewFile = {
               source: buffer,
               name: subName,
               extension: subExt,
-              mimeType: subMime
+              mimeType: subMime,
+              size: buffer.byteLength,
+              blob
             };
 
             const plugins = [...(ctx.options.plugins || []), fallbackPlugin()];
-            let matchedPlugin = plugins.find((p) => p.match(subFile)) || fallbackPlugin();
+            let matchedPlugin = await findSubPreviewPlugin(plugins, subFile);
+            if (destroyed || token !== renderToken) {
+              return;
+            }
             if (matchedPlugin.name === "archive") {
               matchedPlugin = fallbackPlugin();
             }
 
-            currentSubInstance = await matchedPlugin.render({
-              host: ctx.host,
-              viewport: subViewport,
-              file: subFile,
-              size: { width: subViewport.clientWidth || 600, height: subViewport.clientHeight || 400 },
-              options: ctx.options,
-              setLoading: () => {},
-              setError: (err) => {
-                subViewport.innerHTML = `<div class="ofv-fallback"><strong>文件预览失败</strong><span>${err}</span></div>`;
-              }
-            });
+            let previewError: Error | undefined;
+            const nextSubInstance = await Promise.resolve()
+              .then(() =>
+                matchedPlugin.render({
+                host: ctx.host,
+                viewport: subViewport,
+                file: subFile,
+                size: { width: subViewport.clientWidth || 600, height: subViewport.clientHeight || 400 },
+                options: ctx.options,
+                setLoading: () => {},
+                setError: (err) => {
+                  previewError = err instanceof Error ? err : new Error(String(err));
+                  subViewport.replaceChildren(createInlineError("文件预览失败", previewError.message));
+                }
+                })
+              )
+              .catch((error: unknown) => {
+                previewError = error instanceof Error ? error : new Error(String(error));
+                subViewport.replaceChildren(createInlineError("文件预览失败", previewError.message));
+                return undefined;
+              });
+            if (destroyed || token !== renderToken) {
+              nextSubInstance?.destroy();
+              return;
+            }
+            if (nextSubInstance && !previewError) {
+              currentSubInstance = nextSubInstance;
+            } else if (nextSubInstance) {
+              nextSubInstance.destroy();
+            }
           } catch (err: any) {
-            mainPanel.innerHTML = `<div class="ofv-fallback"><strong>解压加载失败</strong><span>${err.message || err}</span></div>`;
+            if (destroyed || token !== renderToken) {
+              return;
+            }
+            mainPanel.replaceChildren(createInlineError("解压加载失败", String(err.message || err)));
           }
         });
       });
 
       return {
+        resize(size) {
+          currentSubInstance?.resize?.(size);
+        },
         destroy() {
+          destroyed = true;
+          renderToken += 1;
           if (currentSubInstance) {
             currentSubInstance.destroy();
           }
@@ -316,6 +384,45 @@ export function archivePlugin(): PreviewPlugin {
       };
     }
   };
+}
+
+async function findSubPreviewPlugin(plugins: PreviewPlugin[], file: PreviewFile): Promise<PreviewPlugin> {
+  for (const plugin of plugins) {
+    if (await plugin.match(file)) {
+      return plugin;
+    }
+  }
+  return fallbackPlugin();
+}
+
+function createInlineError(titleText: string, detailText: string): HTMLElement {
+  const fallback = document.createElement("div");
+  fallback.className = "ofv-fallback";
+  const title = document.createElement("strong");
+  title.textContent = titleText;
+  const detail = document.createElement("span");
+  detail.textContent = detailText;
+  fallback.append(title, detail);
+  return fallback;
+}
+
+function appendArchiveInfo(parent: HTMLElement, label: string, value: string): void {
+  const row = document.createElement("div");
+  const key = document.createElement("strong");
+  key.textContent = `${label}：`;
+  row.append(key, document.createTextNode(value));
+  parent.append(row);
+}
+
+function createArchiveLoading(fileName: string): HTMLElement {
+  const loading = document.createElement("div");
+  loading.className = "ofv-archive-loading";
+  const spinner = document.createElement("div");
+  spinner.className = "ofv-archive-loading-spinner";
+  const text = document.createElement("span");
+  text.textContent = `正在解压并加载 [${fileName}]...`;
+  loading.append(spinner, text);
+  return loading;
 }
 
 // 5. Lightweight TAR parser

@@ -105,6 +105,10 @@ export function imagePlugin(): PreviewPlugin {
         zoomLabel.textContent = `${Math.round(scale * 100)}%`;
       };
 
+      const showImageFallback = () => {
+        stage.replaceChildren(createImageFallback(ctx.file.name, url));
+      };
+
       const setScale = (nextScale: number) => {
         scale = Math.min(8, Math.max(0.1, nextScale));
         updateTransform();
@@ -183,6 +187,7 @@ export function imagePlugin(): PreviewPlugin {
       stage.addEventListener("pointerup", onPointerUp);
       stage.addEventListener("pointercancel", onPointerUp);
       stage.addEventListener("wheel", onWheel, { passive: false });
+      image.addEventListener("error", showImageFallback);
 
       stage.append(image);
       wrapper.append(controls, stage);
@@ -190,6 +195,15 @@ export function imagePlugin(): PreviewPlugin {
       updateTransform();
 
       return {
+        canCommand(command) {
+          return (
+            command === "zoom-in" ||
+            command === "zoom-out" ||
+            command === "zoom-reset" ||
+            command === "rotate-right" ||
+            command === "rotate-left"
+          );
+        },
         command(command) {
           if (command === "zoom-in") {
             setScale(scale + 0.25);
@@ -228,6 +242,7 @@ export function imagePlugin(): PreviewPlugin {
           stage.removeEventListener("pointerup", onPointerUp);
           stage.removeEventListener("pointercancel", onPointerUp);
           stage.removeEventListener("wheel", onWheel);
+          image.removeEventListener("error", showImageFallback);
           wrapper.remove();
           if (convertedBlob) {
             URL.revokeObjectURL(url);
@@ -238,6 +253,25 @@ export function imagePlugin(): PreviewPlugin {
       };
     }
   };
+}
+
+function createImageFallback(fileName: string, url: string): HTMLElement {
+  const fallback = document.createElement("div");
+  fallback.className = "ofv-fallback";
+
+  const title = document.createElement("strong");
+  title.textContent = "图片预览失败";
+
+  const meta = document.createElement("span");
+  meta.textContent = "当前浏览器无法直接显示该图片，文件可能已损坏或编码暂不受支持。";
+
+  const download = document.createElement("a");
+  download.href = url;
+  download.download = fileName;
+  download.textContent = "下载图片";
+
+  fallback.append(title, meta, download);
+  return fallback;
 }
 
 function objectFit(fit: string): string {

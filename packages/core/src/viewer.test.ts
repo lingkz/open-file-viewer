@@ -1,0 +1,495 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createViewer } from "./viewer";
+import type { PreviewPlugin } from "./types";
+
+describe("createViewer", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.restoreAllMocks();
+  });
+
+  it("renders, dispatches toolbar commands, and destroys cleanly", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const command = vi.fn();
+    const destroy = vi.fn();
+    const plugin: PreviewPlugin = {
+      name: "test",
+      match: (file) => file.extension === "txt",
+      render(ctx) {
+        const content = document.createElement("div");
+        content.textContent = ctx.file.name;
+        ctx.viewport.append(content);
+        return { command, destroy };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    const zoomIn = container.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]');
+    expect(zoomIn).not.toBeNull();
+    await waitFor(() => zoomIn?.disabled === false);
+    expect(zoomIn?.disabled).toBe(false);
+
+    zoomIn?.click();
+    expect(command).toHaveBeenCalledWith("zoom-in");
+
+    viewer.destroy();
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(container.childElementCount).toBe(0);
+  });
+
+  it("disables toolbar commands unsupported by the active preview", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const command = vi.fn();
+    const plugin: PreviewPlugin = {
+      name: "selective",
+      match: (file) => file.extension === "txt",
+      render(ctx) {
+        const content = document.createElement("div");
+        content.textContent = ctx.file.name;
+        ctx.viewport.append(content);
+        return {
+          canCommand: (nextCommand) => nextCommand === "zoom-in",
+          command,
+          destroy: vi.fn()
+        };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    const zoomIn = container.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]');
+    const zoomOut = container.querySelector<HTMLButtonElement>('button[aria-label="Zoom out"]');
+    const rotate = container.querySelector<HTMLButtonElement>('button[aria-label="Rotate right"]');
+
+    await waitFor(() => zoomIn?.disabled === false);
+    expect(zoomIn?.disabled).toBe(false);
+    expect(zoomOut?.disabled).toBe(true);
+    expect(rotate?.disabled).toBe(true);
+
+    zoomIn?.click();
+    zoomOut?.click();
+    rotate?.click();
+    expect(command).toHaveBeenCalledTimes(1);
+    expect(command).toHaveBeenCalledWith("zoom-in");
+
+    viewer.destroy();
+  });
+
+  it("keeps current queue item metadata when reloading a Blob", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const renderedNames: string[] = [];
+    const plugin: PreviewPlugin = {
+      name: "named",
+      match: (file) => file.extension === "custom",
+      render(ctx) {
+        renderedNames.push(`${ctx.file.name}:${ctx.file.extension}:${ctx.file.mimeType}`);
+        const content = document.createElement("div");
+        content.textContent = ctx.file.name;
+        ctx.viewport.append(content);
+        return { destroy: vi.fn() };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      files: [
+        {
+          file: new Blob(["one"], { type: "application/octet-stream" }),
+          fileName: "one.custom",
+          mimeType: "application/x-custom"
+        },
+        {
+          file: new Blob(["two"], { type: "application/octet-stream" }),
+          fileName: "two.custom",
+          mimeType: "application/x-custom"
+        }
+      ],
+      plugins: [plugin]
+    });
+
+    await waitFor(() => renderedNames.length === 1);
+    await viewer.next();
+    await waitFor(() => renderedNames.length === 2);
+    await viewer.reload(new Blob(["replacement"], { type: "application/octet-stream" }));
+    await waitFor(() => renderedNames.length === 3);
+
+    expect(renderedNames).toEqual([
+      "one.custom:custom:application/x-custom",
+      "two.custom:custom:application/x-custom",
+      "two.custom:custom:application/x-custom"
+    ]);
+
+    viewer.destroy();
+  });
+
+  it("clears search highlights when navigating between queued files", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const plugin: PreviewPlugin = {
+      name: "searchable",
+      match: (file) => file.extension === "txt",
+      render(ctx) {
+        const content = document.createElement("p");
+        content.textContent = ctx.file.name === "first.txt" ? "alpha alpha" : "beta only";
+        ctx.viewport.append(content);
+        return { destroy: vi.fn() };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      files: [
+        { file: new Blob(["first"], { type: "text/plain" }), fileName: "first.txt" },
+        { file: new Blob(["second"], { type: "text/plain" }), fileName: "second.txt" }
+      ],
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    await waitFor(() => container.textContent?.includes("alpha alpha") === true);
+
+    const searchInput = container.querySelector<HTMLInputElement>('input[aria-label="Search preview text"]');
+    expect(searchInput).not.toBeNull();
+    searchInput!.value = "alpha";
+    searchInput!.dispatchEvent(new InputEvent("input", { bubbles: true }));
+
+    await waitFor(() => container.querySelectorAll("mark.ofv-search-match").length === 2);
+    expect(container.querySelector(".ofv-toolbar-search-count")?.textContent).toBe("2");
+
+    await viewer.next();
+    await waitFor(() => container.textContent?.includes("beta only") === true);
+
+    expect(container.querySelectorAll("mark.ofv-search-match")).toHaveLength(0);
+    expect(container.querySelector(".ofv-toolbar-search-count")?.textContent).toBe("");
+
+    viewer.destroy();
+  });
+
+  it("searches accessible iframe body text", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const plugin: PreviewPlugin = {
+      name: "iframe-search",
+      match: () => true,
+      render(ctx) {
+        const iframe = document.createElement("iframe");
+        ctx.viewport.append(iframe);
+        const doc = iframe.contentDocument;
+        if (doc) {
+          doc.open();
+          doc.write("<!doctype html><body><p>inside iframe text</p></body>");
+          doc.close();
+        }
+        return { destroy: vi.fn() };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    await waitFor(() => Boolean(container.querySelector("iframe")?.contentDocument?.body?.textContent?.includes("inside")));
+
+    const searchInput = container.querySelector<HTMLInputElement>('input[aria-label="Search preview text"]');
+    searchInput!.value = "iframe";
+    searchInput!.dispatchEvent(new InputEvent("input", { bubbles: true }));
+
+    const iframeBody = container.querySelector("iframe")?.contentDocument?.body;
+    await waitFor(() => iframeBody?.querySelectorAll("mark.ofv-search-match").length === 1);
+    expect(container.querySelector(".ofv-toolbar-search-count")?.textContent).toBe("1");
+
+    searchInput!.value = "";
+    searchInput!.dispatchEvent(new InputEvent("input", { bubbles: true }));
+
+    expect(iframeBody?.querySelectorAll("mark.ofv-search-match")).toHaveLength(0);
+
+    viewer.destroy();
+  });
+
+  it("downloads files from the toolbar and cleans temporary links", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const objectUrl = "blob:download";
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => objectUrl),
+      revokeObjectURL: vi.fn()
+    });
+
+    const clicked: string[] = [];
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click(this: HTMLAnchorElement) {
+      clicked.push(`${this.href}:${this.download}`);
+    });
+
+    const plugin: PreviewPlugin = {
+      name: "downloadable",
+      match: () => true,
+      render(ctx) {
+        const content = document.createElement("div");
+        content.textContent = ctx.file.name;
+        ctx.viewport.append(content);
+        return { destroy: vi.fn() };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-viewport")?.textContent?.includes("hello.txt")));
+    container.querySelector<HTMLButtonElement>('button[aria-label="Download file"]')?.click();
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(clicked).toEqual([`${objectUrl}:hello.txt`]);
+    expect(document.body.querySelector(`a[href="${objectUrl}"]`)).not.toBeNull();
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    expect(document.body.querySelector(`a[href="${objectUrl}"]`)).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl);
+
+    viewer.destroy();
+  });
+
+  it("prints the current viewport from the toolbar", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const print = vi.fn();
+    const focus = vi.fn();
+    Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", {
+      configurable: true,
+      get() {
+        return { focus, print };
+      }
+    });
+
+    const plugin: PreviewPlugin = {
+      name: "printable",
+      match: () => true,
+      render(ctx) {
+        const content = document.createElement("div");
+        content.textContent = "print me";
+        ctx.viewport.append(content);
+        return { destroy: vi.fn() };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-viewport")?.textContent?.includes("print me")));
+    container.querySelector<HTMLButtonElement>('button[aria-label="Print preview"]')?.click();
+
+    await waitFor(() => print.mock.calls.length === 1);
+
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".ofv-print-frame")).not.toBeNull();
+
+    viewer.destroy();
+  });
+
+  it("removes the print iframe after printing", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const print = vi.fn();
+    Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", {
+      configurable: true,
+      get() {
+        return { focus: vi.fn(), print };
+      }
+    });
+
+    const plugin: PreviewPlugin = {
+      name: "print-cleanup",
+      match: () => true,
+      render(ctx) {
+        ctx.viewport.textContent = "print cleanup";
+        return { destroy: vi.fn() };
+      }
+    };
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: true,
+      plugins: [plugin]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-viewport")?.textContent?.includes("print cleanup")));
+    container.querySelector<HTMLButtonElement>('button[aria-label="Print preview"]')?.click();
+
+    await waitFor(() => print.mock.calls.length === 1);
+    expect(document.querySelector(".ofv-print-frame")).not.toBeNull();
+
+    await waitFor(() => document.querySelector(".ofv-print-frame") === null, 1500);
+
+    viewer.destroy();
+  });
+
+  it("cleans auto theme listeners on destroy", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener,
+        removeEventListener
+      }))
+    );
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      theme: "auto",
+      plugins: [
+        {
+          name: "noop",
+          match: () => true,
+          render(ctx) {
+            ctx.viewport.textContent = "ok";
+            return { destroy: vi.fn() };
+          }
+        }
+      ]
+    });
+
+    expect(container.classList.contains("ofv-theme-dark")).toBe(true);
+    expect(addEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+
+    viewer.destroy();
+
+    expect(removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+    expect(container.classList.contains("ofv-theme-dark")).toBe(false);
+  });
+
+  it("falls back to window resize events when ResizeObserver is unavailable", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const addEventListener = vi.spyOn(window, "addEventListener");
+    const removeEventListener = vi.spyOn(window, "removeEventListener");
+    const OriginalResizeObserver = globalThis.ResizeObserver;
+    Reflect.deleteProperty(globalThis, "ResizeObserver");
+    const resize = vi.fn();
+
+    try {
+      const viewer = createViewer({
+        container,
+        file: new Blob(["hello"], { type: "text/plain" }),
+        fileName: "hello.txt",
+        plugins: [
+          {
+            name: "resize",
+            match: () => true,
+            render(ctx) {
+              ctx.viewport.textContent = "resizable";
+              return { resize, destroy: vi.fn() };
+            }
+          }
+        ]
+      });
+
+      await waitFor(() => Boolean(container.textContent?.includes("resizable")));
+      window.dispatchEvent(new Event("resize"));
+
+      expect(addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+      expect(resize).toHaveBeenCalled();
+
+      viewer.destroy();
+
+      expect(removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+    } finally {
+      Object.defineProperty(globalThis, "ResizeObserver", {
+        configurable: true,
+        writable: true,
+        value: OriginalResizeObserver
+      });
+    }
+  });
+
+  it("supports legacy matchMedia listeners", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const addListener = vi.fn();
+    const removeListener = vi.fn();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        addListener,
+        removeListener
+      }))
+    );
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      theme: "auto",
+      plugins: [
+        {
+          name: "noop",
+          match: () => true,
+          render(ctx) {
+            ctx.viewport.textContent = "ok";
+            return { destroy: vi.fn() };
+          }
+        }
+      ]
+    });
+
+    expect(addListener).toHaveBeenCalledWith(expect.any(Function));
+
+    viewer.destroy();
+
+    expect(removeListener).toHaveBeenCalledWith(expect.any(Function));
+  });
+});
+
+async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeout) {
+      throw new Error("Timed out waiting for condition.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}

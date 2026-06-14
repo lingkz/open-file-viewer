@@ -1,13 +1,38 @@
-import type { PreviewPlugin, PreviewSize } from "../types";
+import type { PreviewContext, PreviewInstance, PreviewPlugin, PreviewSize } from "../types";
 import { createObjectUrl, revokeObjectUrl } from "../dom";
+import { resolveFormat } from "./utils";
 
 const modelExtensions = new Set(["gltf", "glb", "obj", "stl", "fbx", "dae", "ply", "3mf"]);
+const modelMimeTypes = new Set([
+  "model/gltf+json",
+  "model/gltf-binary",
+  "model/stl",
+  "model/obj",
+  "model/vnd.collada+xml",
+  "model/3mf",
+  "application/sla",
+  "application/vnd.ms-pki.stl",
+  "application/ply",
+  "application/vnd.autodesk.fbx"
+]);
+const modelMimeFormatMap: Record<string, string> = {
+  "model/gltf+json": "gltf",
+  "model/gltf-binary": "glb",
+  "model/stl": "stl",
+  "model/obj": "obj",
+  "model/vnd.collada+xml": "dae",
+  "model/3mf": "3mf",
+  "application/sla": "stl",
+  "application/vnd.ms-pki.stl": "stl",
+  "application/ply": "ply",
+  "application/vnd.autodesk.fbx": "fbx"
+};
 
 export function model3dPlugin(): PreviewPlugin {
   return {
     name: "model3d",
     match(file) {
-      return modelExtensions.has(file.extension);
+      return modelExtensions.has(file.extension) || (file.extension === "" && modelMimeTypes.has(file.mimeType));
     },
     async render(ctx) {
       const THREE = await import("three");
@@ -25,8 +50,17 @@ export function model3dPlugin(): PreviewPlugin {
       const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
       camera.position.set(2.5, 2, 3.5);
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      let renderer: import("three").WebGLRenderer;
+      try {
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+      } catch {
+        stage.remove();
+        return renderModelFallback(ctx, url, isExternal, "当前浏览器或设备不支持 WebGL，无法直接渲染 3D 模型。");
+      }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
       stage.append(renderer.domElement);
 
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -38,7 +72,14 @@ export function model3dPlugin(): PreviewPlugin {
       scene.add(directional);
       scene.add(new THREE.GridHelper(10, 10, 0xcbd5e1, 0xe5e7eb));
 
-      const loaded = await loadModel(ctx.file.extension, url, THREE);
+      const extension = resolveFormat(ctx.file, modelMimeFormatMap);
+      const loaded = await loadModel(extension, url, THREE).catch(() => undefined);
+      if (!loaded) {
+        controls.dispose();
+        renderer.dispose();
+        stage.remove();
+        return renderModelFallback(ctx, url, isExternal, "无法解析当前 3D 模型内容。");
+      }
       if (loaded.message) {
         const message = document.createElement("div");
         message.className = "ofv-model-message";
@@ -48,6 +89,9 @@ export function model3dPlugin(): PreviewPlugin {
       const object = loaded.object;
       scene.add(object);
       const initialFrame = frameObject(object, camera, controls, THREE);
+      const measurement = measureObject(object, THREE);
+      stage.append(createMeasurementPanel(measurement));
+      stage.append(createMaterialPanel(collectMaterialStats(object)));
 
       let animationFrame = 0;
       const animate = () => {
@@ -67,6 +111,15 @@ export function model3dPlugin(): PreviewPlugin {
       resize(ctx.size);
 
       return {
+        canCommand(command) {
+          return (
+            command === "zoom-in" ||
+            command === "zoom-out" ||
+            command === "zoom-reset" ||
+            command === "rotate-right" ||
+            command === "rotate-left"
+          );
+        },
         command(command) {
           if (command === "zoom-in" || command === "zoom-out") {
             const factor = command === "zoom-in" ? 0.82 : 1.18;
@@ -100,6 +153,42 @@ export function model3dPlugin(): PreviewPlugin {
           revokeObjectUrl(url, isExternal);
         }
       };
+    }
+  };
+}
+
+function renderModelFallback(
+  ctx: PreviewContext,
+  url: string,
+  isExternal: boolean,
+  message: string
+): PreviewInstance {
+  const panel = document.createElement("div");
+  panel.className = "ofv-fallback";
+
+  const title = document.createElement("strong");
+  title.textContent = "3D 预览不可用";
+
+  const detail = document.createElement("span");
+  detail.textContent = `${message} ${ctx.file.name}`;
+
+  const download = document.createElement("a");
+  download.href = url;
+  download.download = ctx.file.name;
+  download.textContent = "下载文件";
+
+  panel.append(title, detail, download);
+  ctx.viewport.classList.add("ofv-center");
+  ctx.viewport.append(panel);
+
+  return {
+    canCommand() {
+      return false;
+    },
+    destroy() {
+      ctx.viewport.classList.remove("ofv-center");
+      panel.remove();
+      revokeObjectUrl(url, isExternal);
     }
   };
 }
@@ -165,6 +254,134 @@ function frameObject(
   };
 }
 
+type ModelMeasurement = {
+  width: number;
+  height: number;
+  depth: number;
+  diagonal: number;
+  center: { x: number; y: number; z: number };
+};
+
+type MaterialStats = {
+  meshes: number;
+  materials: number;
+  textures: number;
+  slots: string[];
+  names: string[];
+};
+
+function measureObject(object: import("three").Object3D, THREE: typeof import("three")): ModelMeasurement {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  return {
+    width: size.x,
+    height: size.y,
+    depth: size.z,
+    diagonal: Math.sqrt(size.x ** 2 + size.y ** 2 + size.z ** 2),
+    center: { x: center.x, y: center.y, z: center.z }
+  };
+}
+
+function createMeasurementPanel(measurement: ModelMeasurement): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "ofv-model-measure";
+  const title = document.createElement("strong");
+  title.textContent = "模型测量";
+  const list = document.createElement("dl");
+  appendMeasure(list, "宽", measurement.width);
+  appendMeasure(list, "高", measurement.height);
+  appendMeasure(list, "深", measurement.depth);
+  appendMeasure(list, "对角线", measurement.diagonal);
+  appendMeasure(
+    list,
+    "中心",
+    `${formatMeasure(measurement.center.x)}, ${formatMeasure(measurement.center.y)}, ${formatMeasure(measurement.center.z)}`
+  );
+  panel.append(title, list);
+  return panel;
+}
+
+function appendMeasure(list: HTMLDListElement, label: string, value: number | string): void {
+  const term = document.createElement("dt");
+  term.textContent = label;
+  const detail = document.createElement("dd");
+  detail.textContent = typeof value === "number" ? formatMeasure(value) : value;
+  list.append(term, detail);
+}
+
+function formatMeasure(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+  const rounded = Math.abs(value) >= 100 ? value.toFixed(1) : value.toFixed(3);
+  return rounded.replace(/\.?0+$/, "");
+}
+
+function collectMaterialStats(object: import("three").Object3D): MaterialStats {
+  const materials = new Set<import("three").Material>();
+  const textures = new Set<unknown>();
+  const slots = new Set<string>();
+  const names = new Set<string>();
+  let meshes = 0;
+
+  object.traverse((child) => {
+    const mesh = child as import("three").Mesh;
+    if (!mesh.geometry || !mesh.material) {
+      return;
+    }
+    meshes += 1;
+    for (const material of normalizeMaterials(mesh.material)) {
+      materials.add(material);
+      if (material.name) {
+        names.add(material.name);
+      }
+      for (const slot of textureSlots) {
+        const texture = (material as unknown as Record<string, unknown>)[slot];
+        if (texture) {
+          textures.add(texture);
+          slots.add(slot);
+        }
+      }
+    }
+  });
+
+  return {
+    meshes,
+    materials: materials.size,
+    textures: textures.size,
+    slots: [...slots],
+    names: [...names].slice(0, 6)
+  };
+}
+
+function createMaterialPanel(stats: MaterialStats): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "ofv-model-materials";
+  const title = document.createElement("strong");
+  title.textContent = "材质贴图";
+
+  const list = document.createElement("dl");
+  appendMaterialStat(list, "网格", stats.meshes);
+  appendMaterialStat(list, "材质", stats.materials);
+  appendMaterialStat(list, "贴图", stats.textures);
+  appendMaterialStat(list, "槽位", stats.slots.length > 0 ? stats.slots.join(", ") : "-");
+  if (stats.names.length > 0) {
+    appendMaterialStat(list, "名称", stats.names.join(", "));
+  }
+
+  panel.append(title, list);
+  return panel;
+}
+
+function appendMaterialStat(list: HTMLDListElement, label: string, value: number | string): void {
+  const term = document.createElement("dt");
+  term.textContent = label;
+  const detail = document.createElement("dd");
+  detail.textContent = String(value);
+  list.append(term, detail);
+}
+
 function disposeObject(object: import("three").Object3D, THREE: typeof import("three")): void {
   object.traverse((child) => {
     const mesh = child as import("three").Mesh;
@@ -172,10 +389,39 @@ function disposeObject(object: import("three").Object3D, THREE: typeof import("t
       mesh.geometry.dispose();
     }
     const material = mesh.material;
-    if (Array.isArray(material)) {
-      material.forEach((item) => item.dispose());
-    } else if (material instanceof THREE.Material) {
-      material.dispose();
+    for (const item of normalizeMaterials(material)) {
+      disposeMaterialTextures(item);
+      item.dispose();
     }
   });
+}
+
+const textureSlots = [
+  "map",
+  "aoMap",
+  "alphaMap",
+  "bumpMap",
+  "displacementMap",
+  "emissiveMap",
+  "envMap",
+  "lightMap",
+  "metalnessMap",
+  "normalMap",
+  "roughnessMap"
+];
+
+function normalizeMaterials(
+  material: import("three").Material | import("three").Material[] | undefined
+): import("three").Material[] {
+  if (!material) {
+    return [];
+  }
+  return Array.isArray(material) ? material : [material];
+}
+
+function disposeMaterialTextures(material: import("three").Material): void {
+  for (const slot of textureSlots) {
+    const texture = (material as unknown as Record<string, { dispose?: () => void } | undefined>)[slot];
+    texture?.dispose?.();
+  }
 }

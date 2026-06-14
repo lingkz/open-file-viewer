@@ -38,17 +38,36 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
       ctx.viewport.append(scroller);
 
       const documentTask = pdf.getDocument(url);
-      const doc = await documentTask.promise;
+      const doc = await documentTask.promise.catch((error: unknown) => {
+        scroller.remove();
+        ctx.viewport.classList.add("ofv-center");
+        const fallback = createPdfFallback(ctx.file.name, url, normalizePdfError(error));
+        ctx.viewport.append(fallback);
+        return undefined;
+      });
+      if (!doc) {
+        return {
+          destroy() {
+            ctx.viewport.classList.remove("ofv-center");
+            documentTask.destroy?.();
+            revokeObjectUrl(url, isExternal);
+          }
+        };
+      }
 
       // Fast-extract page dimensions
       const pagesMeta: Array<{ width: number; height: number }> = [];
       for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
-        const page = await doc.getPage(pageNumber);
-        const baseViewport = page.getViewport({ scale: 1 });
-        pagesMeta.push({
-          width: baseViewport.width,
-          height: baseViewport.height
-        });
+        try {
+          const page = await doc.getPage(pageNumber);
+          const baseViewport = page.getViewport({ scale: 1 });
+          pagesMeta.push({
+            width: baseViewport.width,
+            height: baseViewport.height
+          });
+        } catch {
+          pagesMeta.push({ width: 612, height: 792 });
+        }
       }
 
       const pageStates: Array<{
@@ -79,7 +98,7 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
         state.canvas = null;
         state.rendered = false;
         state.wrapper.replaceChildren();
-        state.wrapper.innerHTML = `<div class="ofv-pdf-skeleton">页面 ${pageIdx + 1} 加载中...</div>`;
+        state.wrapper.append(createPageStatus("ofv-pdf-skeleton", `页面 ${pageIdx + 1} 加载中...`));
       };
 
       // Perform actual on-demand rendering on canvas and build text layer
@@ -159,7 +178,7 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
         } catch (err) {
           console.error(`Failed to render PDF page ${pageIdx + 1}:`, err);
           state.rendered = false;
-          state.wrapper.innerHTML = `<div class="ofv-pdf-error">无法渲染该页面</div>`;
+          state.wrapper.replaceChildren(createPageStatus("ofv-pdf-error", "无法渲染该页面"));
         }
       };
 
@@ -168,29 +187,31 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
         scroller.replaceChildren();
         pageStates.length = 0;
 
-        observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              const pageIdx = parseInt(entry.target.getAttribute("data-page-index") || "0", 10);
-              const state = pageStates[pageIdx];
-              if (!state) return;
+        if (typeof IntersectionObserver !== "undefined") {
+          observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                const pageIdx = parseInt(entry.target.getAttribute("data-page-index") || "0", 10);
+                const state = pageStates[pageIdx];
+                if (!state) return;
 
-              if (entry.isIntersecting) {
-                if (!state.rendered) {
-                  void renderPage(pageIdx, size);
+                if (entry.isIntersecting) {
+                  if (!state.rendered) {
+                    void renderPage(pageIdx, size);
+                  }
+                } else {
+                  if (state.rendered && doc.numPages > 8) {
+                    clearPage(pageIdx);
+                  }
                 }
-              } else {
-                if (state.rendered && doc.numPages > 8) {
-                  clearPage(pageIdx);
-                }
-              }
-            });
-          },
-          {
-            root: scroller,
-            rootMargin: "400px 0px 400px 0px"
-          }
-        );
+              });
+            },
+            {
+              root: scroller,
+              rootMargin: "400px 0px 400px 0px"
+            }
+          );
+        }
 
         for (let i = 0; i < doc.numPages; i++) {
           const meta = pagesMeta[i];
@@ -207,10 +228,9 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
           wrapper.setAttribute("data-page-index", String(i));
           wrapper.style.width = `${w}px`;
           wrapper.style.height = `${h}px`;
-          wrapper.innerHTML = `<div class="ofv-pdf-skeleton">页面 ${i + 1} 加载中...</div>`;
+          wrapper.append(createPageStatus("ofv-pdf-skeleton", `页面 ${i + 1} 加载中...`));
 
           scroller.appendChild(wrapper);
-          observer.observe(wrapper);
 
           pageStates.push({
             wrapper,
@@ -218,6 +238,12 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
             renderTask: null,
             rendered: false
           });
+
+          if (observer) {
+            observer.observe(wrapper);
+          } else {
+            void renderPage(i, size);
+          }
         }
       };
 
@@ -225,6 +251,9 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
 
       let resizeTimer: number | undefined;
       return {
+        canCommand(command) {
+          return command === "zoom-in" || command === "zoom-out" || command === "zoom-reset";
+        },
         command(command) {
           if (command === "zoom-in") {
             zoomFactor = Math.min(4, zoomFactor + 0.15);
@@ -278,6 +307,45 @@ function normalizePdfOptions(options: PdfJsModule | PdfPluginOptions): PdfPlugin
     return { pdfjs: options };
   }
   return options;
+}
+
+function createPageStatus(className: string, text: string): HTMLDivElement {
+  const status = document.createElement("div");
+  status.className = className;
+  status.textContent = text;
+  return status;
+}
+
+function createPdfFallback(fileName: string, url: string, message: string): HTMLElement {
+  const fallback = document.createElement("div");
+  fallback.className = "ofv-fallback";
+
+  const title = document.createElement("strong");
+  title.textContent = "PDF 预览失败";
+
+  const meta = document.createElement("span");
+  meta.textContent = `${message} ${fileName}`;
+
+  const download = document.createElement("a");
+  download.href = url;
+  download.download = fileName;
+  download.textContent = "下载 PDF";
+
+  fallback.append(title, meta, download);
+  return fallback;
+}
+
+function normalizePdfError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const name = typeof error === "object" && error !== null && "name" in error ? String((error as { name?: unknown }).name) : "";
+  const lower = `${name} ${message}`.toLowerCase();
+  if (lower.includes("password")) {
+    return "该 PDF 受密码保护，当前无法在浏览器内直接预览。";
+  }
+  if (lower.includes("invalid") || lower.includes("missing") || lower.includes("corrupt")) {
+    return "该 PDF 文件可能已损坏或格式无效。";
+  }
+  return "当前浏览器无法加载该 PDF。";
 }
 
 function configurePdfWorker(pdf: PdfJsModule, workerSrc?: string): void {

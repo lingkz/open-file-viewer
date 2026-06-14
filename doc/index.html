@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Open File Viewer is a container-first file preview SDK for vanilla JavaScript, React and Vue."
+    />
+    <title>Open File Viewer - File Preview SDK for JS, React and Vue</title>
+  </head>
+  <body>
+    <header class="site-nav">
+      <a class="brand" href="#/" aria-label="Open File Viewer home">
+        <span class="brand-mark">OFV</span>
+        <span>Open File Viewer</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#/" data-route="/" data-i18n="nav.home">首页</a>
+        <a href="#/api" data-route="/api" data-i18n="nav.api">API</a>
+        <a href="#/frameworks" data-route="/frameworks" data-i18n="nav.frameworks">框架</a>
+        <a href="#/formats" data-route="/formats" data-i18n="nav.formats">格式</a>
+        <a href="#/cases" data-route="/cases" data-i18n="nav.cases">案例</a>
+        <a href="#/playground" data-route="/playground" data-i18n="nav.playground">在线使用</a>
+      </nav>
+      <div class="nav-actions" aria-label="Display preferences">
+        <button class="pill-button" id="languageToggle" type="button">EN</button>
+        <button class="icon-button" id="themeToggle" type="button" aria-label="Toggle dark mode">◐</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="view active" id="view-home" data-view="/">
+        <div class="hero-section reveal">
+          <div class="hero-bg" aria-hidden="true"></div>
+          <div class="hero-copy">
+            <p class="eyebrow" data-i18n="hero.eyebrow">文件预览 SDK</p>
+            <h1 data-i18n="hero.title">Open File Viewer</h1>
+            <p class="hero-lede" data-i18n="hero.lede">
+              兼容原生 JavaScript、React 和 Vue 的浏览器文件预览库。用一个稳定容器承载 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D 和 GIS。
+            </p>
+            <div class="hero-actions">
+              <a class="primary-action" href="#/playground" data-i18n="hero.primary">在线体验</a>
+              <a class="secondary-action" href="#/api" data-i18n="hero.secondary">查看 API</a>
+            </div>
+            <div class="framework-strip" aria-label="Framework compatibility">
+              <span><strong>Vanilla JS</strong><small data-i18n="hero.native">无框架也能接入</small></span>
+              <span><strong>React</strong><small data-i18n="hero.react">组件式附件预览</small></span>
+              <span><strong>Vue</strong><small data-i18n="hero.vue">组合式项目友好</small></span>
+            </div>
+          </div>
+          <div class="hero-product" aria-label="Open File Viewer preview">
+            <div class="window-frame floating-preview">
+              <div class="window-dots"><span></span><span></span><span></span></div>
+              <div class="mock-toolbar">
+                <span>Queue</span>
+                <span>PDF</span>
+                <span>Office</span>
+                <span>3D</span>
+              </div>
+              <div class="mock-viewer">
+                <div class="mock-sidebar">
+                  <span class="active"></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="mock-document">
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div class="wide"></div>
+                </div>
+                <div class="mock-inspector">
+                  <strong>createViewer()</strong>
+                  <p>container: "#viewer"</p>
+                  <p>theme: "auto"</p>
+                  <p>plugins: all</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="section reveal">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow" data-i18n="home.whyEyebrow">为什么选择它</p>
+              <h2 data-i18n="home.whyTitle">专为产品内嵌预览设计</h2>
+            </div>
+            <p data-i18n="home.whyDesc">
+              它不是一个简单 demo，而是一套可持续扩展的预览基础设施：插件协议、工具栏、主题、多文件队列、错误降级和框架适配都已经成型。
+            </p>
+          </div>
+          <div class="feature-grid">
+            <article>
+              <span>01</span>
+              <h3 data-i18n="features.card1.title">容器优先</h3>
+              <p data-i18n="features.card1.desc">所有内容渲染在你传入的 DOM 容器里，不跳窗口，不打断业务页面。</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3 data-i18n="features.card2.title">插件化格式支持</h3>
+              <p data-i18n="features.card2.desc">每类文件由独立插件负责，后续接入专用渲染器或服务端转换更清晰。</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3 data-i18n="features.card3.title">三端接入</h3>
+              <p data-i18n="features.card3.desc">原生 JS、React、Vue 共用 core 能力，设计系统和业务代码都能稳定复用。</p>
+            </article>
+            <article>
+              <span>04</span>
+              <h3 data-i18n="features.card4.title">可测试降级</h3>
+              <p data-i18n="features.card4.desc">坏文件和浏览器不支持时给出局部提示、下载入口和清晰错误边界。</p>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="view-api" data-view="/api">
+        <section class="doc-hero reveal">
+          <p class="eyebrow" data-i18n="api.eyebrow">API 文档</p>
+          <h1 data-i18n="api.title">从 createViewer 开始</h1>
+          <p data-i18n="api.desc">核心 API 保持克制：容器、文件、插件、尺寸、主题和事件回调。复杂格式能力由插件扩展。</p>
+        </section>
+        <section class="doc-layout reveal">
+          <aside class="doc-sidebar">
+            <a href="#api-options" data-i18n="api.nav.options">PreviewOptions</a>
+            <a href="#api-instance" data-i18n="api.nav.instance">FileViewer</a>
+            <a href="#api-plugin" data-i18n="api.nav.plugin">Plugin Protocol</a>
+          </aside>
+          <div class="doc-content">
+            <article class="doc-panel" id="api-options">
+              <h2>PreviewOptions</h2>
+              <div class="api-table" id="apiOptions"></div>
+            </article>
+            <article class="doc-panel" id="api-instance">
+              <h2>FileViewer</h2>
+              <div class="api-table" id="instanceApi"></div>
+            </article>
+            <article class="doc-panel" id="api-plugin">
+              <h2 data-i18n="api.pluginTitle">自定义插件协议</h2>
+              <p data-i18n="api.pluginDesc">插件只需要实现 match 和 render。render 收到 PreviewContext，并返回可销毁的 PreviewInstance。</p>
+              <pre><code id="pluginCode"></code></pre>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="view-frameworks" data-view="/frameworks">
+        <section class="doc-hero reveal">
+          <p class="eyebrow" data-i18n="frameworks.eyebrow">框架接入</p>
+          <h1 data-i18n="frameworks.title">原生 JS、React、Vue 一套核心</h1>
+          <p data-i18n="frameworks.desc">根据项目栈选择入口。底层插件能力一致，方便团队在多个产品里复用同一套预览策略。</p>
+        </section>
+        <section class="framework-layout reveal">
+          <div class="framework-tabs" role="tablist" aria-label="Framework examples">
+            <button class="active" type="button" data-code-tab="vanilla">Vanilla JS</button>
+            <button type="button" data-code-tab="react">React</button>
+            <button type="button" data-code-tab="vue">Vue</button>
+          </div>
+          <div class="framework-card">
+            <div class="framework-copy" id="frameworkCopy"></div>
+            <pre><code id="codeSample"></code></pre>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="view-formats" data-view="/formats">
+        <section class="doc-hero reveal">
+          <p class="eyebrow" data-i18n="formats.eyebrow">格式矩阵</p>
+          <h1 data-i18n="formats.title">覆盖常见附件、文档和工程文件</h1>
+          <p data-i18n="formats.desc">不同格式会处在不同能力层级：原生预览、基础解析、结构展示、占位识别或下载 fallback。</p>
+        </section>
+        <section class="format-grid reveal" id="formatGrid"></section>
+      </section>
+
+      <section class="view" id="view-cases" data-view="/cases">
+        <section class="doc-hero reveal">
+          <p class="eyebrow" data-i18n="cases.eyebrow">应用案例</p>
+          <h1 data-i18n="cases.title">嵌入真实业务流</h1>
+          <p data-i18n="cases.desc">预览不是孤立页面，而是列表、审批、客服、网盘、知识库、工程资料中心里的关键交互。</p>
+        </section>
+        <section class="case-grid reveal">
+          <article>
+            <h3 data-i18n="cases.card1.title">知识库与网盘</h3>
+            <p data-i18n="cases.card1.desc">文件列表、详情页、全文搜索结果中直接预览附件，减少下载和跳转。</p>
+          </article>
+          <article>
+            <h3 data-i18n="cases.card2.title">审批与合同</h3>
+            <p data-i18n="cases.card2.desc">PDF、Word、Excel、OFD、邮件附件在同一容器中查看，适合企业流程系统。</p>
+          </article>
+          <article>
+            <h3 data-i18n="cases.card3.title">工程资料中心</h3>
+            <p data-i18n="cases.card3.desc">CAD、3D、GIS、压缩包结构预览帮助工程团队快速判断文件内容。</p>
+          </article>
+          <article>
+            <h3 data-i18n="cases.card4.title">SaaS 附件中心</h3>
+            <p data-i18n="cases.card4.desc">在 CRM、工单、项目管理里复用统一预览体验，减少格式碎片化成本。</p>
+          </article>
+        </section>
+      </section>
+
+      <section class="view" id="view-playground" data-view="/playground">
+        <section class="doc-hero reveal">
+          <p class="eyebrow" data-i18n="playground.eyebrow">在线使用</p>
+          <h1 data-i18n="playground.title">把文件拖进来，马上预览</h1>
+          <p data-i18n="playground.desc">本地文件只在浏览器内读取，不会上传。也可以使用内置示例体验 Markdown、JSON、SVG、DXF。</p>
+        </section>
+        <section class="playground-shell reveal">
+          <aside class="playground-controls">
+            <label class="file-drop" for="file">
+              <span data-i18n="playground.dropTitle">选择或拖入文件</span>
+              <small data-i18n="playground.dropDesc">支持多文件队列预览</small>
+              <input id="file" type="file" multiple />
+            </label>
+            <div class="control-group">
+              <label for="sample" data-i18n="playground.sample">内置示例</label>
+              <select id="sample"></select>
+            </div>
+            <div class="control-grid">
+              <label>
+                <span data-i18n="playground.width">宽度</span>
+                <input id="width" value="100%" />
+              </label>
+              <label>
+                <span data-i18n="playground.height">高度</span>
+                <input id="height" value="680px" />
+              </label>
+            </div>
+            <div class="control-grid">
+              <label>
+                <span data-i18n="playground.fit">适配</span>
+                <select id="fit">
+                  <option value="contain">contain</option>
+                  <option value="cover">cover</option>
+                  <option value="width">width</option>
+                  <option value="height">height</option>
+                  <option value="actual">actual</option>
+                  <option value="scale-down">scale-down</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="playground.viewerTheme">预览主题</span>
+                <select id="theme">
+                  <option value="auto">auto</option>
+                  <option value="light">light</option>
+                  <option value="dark">dark</option>
+                </select>
+              </label>
+            </div>
+            <button class="primary-action full" id="apply" type="button" data-i18n="playground.apply">应用设置</button>
+            <div class="status-card">
+              <span data-i18n="playground.current">当前文件</span>
+              <strong id="currentFile">welcome.md</strong>
+            </div>
+          </aside>
+          <section class="viewer-stage">
+            <div id="viewer"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Open File Viewer</span>
+      <span data-i18n="footer.text">Container-first file preview SDK for modern web products.</span>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

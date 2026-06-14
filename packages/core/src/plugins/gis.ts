@@ -1,22 +1,38 @@
 /// <reference path="../shims-gis.d.ts" />
 import type { PreviewPlugin, PreviewFile } from "../types";
-import { readArrayBuffer } from "./utils";
+import { readArrayBuffer, resolveFormat } from "./utils";
 
 const gisExtensions = new Set(["geojson", "topojson", "kml", "kmz", "gpx", "shp"]);
+const gisMimeFormatMap: Record<string, string> = {
+  "application/geo+json": "geojson",
+  "application/vnd.geo+json": "geojson",
+  "application/topo+json": "topojson",
+  "application/vnd.google-earth.kml+xml": "kml",
+  "application/vnd.google-earth.kmz": "kmz",
+  "application/gpx+xml": "gpx"
+};
 
 function loadLeafletCss(): Promise<void> {
   const id = "ofv-leaflet-css";
   if (document.getElementById(id)) {
     return Promise.resolve();
   }
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const link = document.createElement("link");
+    let settled = false;
+    const done = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
     link.id = id;
     link.rel = "stylesheet";
     link.href = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
-    link.onload = () => resolve();
-    link.onerror = () => reject(new Error("Failed to load Leaflet CSS from CDN."));
+    link.onload = done;
+    link.onerror = done;
     document.head.appendChild(link);
+    window.setTimeout(done, 0);
   });
 }
 
@@ -24,7 +40,7 @@ export function gisPlugin(): PreviewPlugin {
   return {
     name: "gis",
     match(file) {
-      return gisExtensions.has(file.extension) || file.mimeType === "application/geo+json";
+      return gisExtensions.has(file.extension) || Boolean(gisMimeFormatMap[file.mimeType]);
     },
     async render(ctx) {
       // 1. Load Leaflet CSS and dynamic imports
@@ -73,15 +89,29 @@ export function gisPlugin(): PreviewPlugin {
         topojsonClient,
         shpLib,
         JSZipLib
-      );
+      ).catch((error: unknown) => {
+        const fallback = createGisFallback("GIS 数据解析失败", normalizeGisError(error, ctx.file.name));
+        ctx.viewport.classList.add("ofv-center");
+        ctx.viewport.append(fallback);
+        return { fallback };
+      });
+
+      if (isGisFallback(geojson)) {
+        return {
+          destroy() {
+            ctx.viewport.classList.remove("ofv-center");
+            geojson.fallback.remove();
+          }
+        };
+      }
 
       // Handle raw unzipped shapefile warning UI
-      if (geojson === null && ctx.file.extension === "shp") {
+      if (geojson === null && resolveFormat(ctx.file, gisMimeFormatMap) === "shp") {
         const fallback = document.createElement("div");
         fallback.className = "ofv-fallback";
 
         const title = document.createElement("strong");
-        title.innerHTML = "⚠️ 无法直接预览单个 .shp 文件";
+        title.textContent = "无法直接预览单个 .shp 文件";
 
         const desc = document.createElement("span");
         desc.textContent = "Shapefile 格式需要包含配套的 .dbf 和 .shx 数据文件。请将它们打包为 .zip 文件后上传预览，或在压缩包列表中直接查看。";
@@ -190,6 +220,26 @@ export function gisPlugin(): PreviewPlugin {
   };
 }
 
+function createGisFallback(titleText: string, detailText: string): HTMLElement {
+  const fallback = document.createElement("div");
+  fallback.className = "ofv-fallback";
+  const title = document.createElement("strong");
+  title.textContent = titleText;
+  const detail = document.createElement("span");
+  detail.textContent = detailText;
+  fallback.append(title, detail);
+  return fallback;
+}
+
+function normalizeGisError(error: unknown, fileName: string): string {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message ? `${fileName}: ${message}` : `${fileName}: 文件内容无法转换为地图数据。`;
+}
+
+function isGisFallback(value: unknown): value is { fallback: HTMLElement } {
+  return typeof value === "object" && value !== null && "fallback" in value;
+}
+
 async function parseToGeoJson(
   file: PreviewFile,
   buffer: ArrayBuffer,
@@ -198,7 +248,7 @@ async function parseToGeoJson(
   shpLib: any,
   JSZipLib: any
 ): Promise<any> {
-  const ext = file.extension.toLowerCase();
+  const ext = resolveFormat(file, gisMimeFormatMap).toLowerCase();
 
   if (ext === "geojson") {
     const text = new TextDecoder().decode(buffer);

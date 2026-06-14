@@ -5,6 +5,7 @@ import {
   createViewer,
   drawingPlugin,
   emailPlugin,
+  epubPlugin,
   imagePlugin,
   model3dPlugin,
   gisPlugin,
@@ -13,6 +14,7 @@ import {
   pdfPlugin,
   textPlugin,
   videoPlugin,
+  xpsPlugin,
   type FileViewer,
   type PreviewFit,
   type PreviewTheme
@@ -31,10 +33,11 @@ const applyButton = document.querySelector<HTMLButtonElement>("#apply")!;
 
 let viewer: FileViewer | null = null;
 let currentFiles: Array<File | Blob> = [
-  new Blob(
+  new File(
     [
       `Open File Viewer\n\n请选择一个本地文件。\n\n这个预览器会固定渲染在右侧容器里，不会跳转新窗口。`
     ],
+    "welcome.txt",
     { type: "text/plain" }
   )
 ];
@@ -56,6 +59,8 @@ function render() {
       videoPlugin(),
       audioPlugin(),
       pdfPlugin({ workerSrc: pdfWorkerSrc }),
+      epubPlugin(),
+      xpsPlugin(),
       officePlugin(),
       ofdPlugin(),
       archivePlugin(),
@@ -73,11 +78,11 @@ function render() {
 }
 
 fileInput.addEventListener("change", () => {
-  const file = fileInput.files?.[0];
-  if (!file) {
+  const files = Array.from(fileInput.files || []);
+  if (!files.length) {
     return;
   }
-  currentFiles = Array.from(fileInput.files || []);
+  currentFiles = files;
   render();
 });
 

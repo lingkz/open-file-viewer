@@ -4,6 +4,7 @@ import {
   cadPlugin,
   drawingPlugin,
   emailPlugin,
+  epubPlugin,
   imagePlugin,
   model3dPlugin,
   gisPlugin,
@@ -11,7 +12,8 @@ import {
   ofdPlugin,
   pdfPlugin,
   textPlugin,
-  videoPlugin
+  videoPlugin,
+  xpsPlugin
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import { FileViewer } from "@open-file-viewer/react";
@@ -24,7 +26,7 @@ import "./style.css";
 function App() {
   const [theme, setTheme] = useState<PreviewTheme>("light");
   const [files, setFiles] = useState<Array<File | Blob>>([
-    new Blob(["React adapter demo\n\n选择本地文件后会在自定义容器内预览。"], {
+    new File(["React adapter demo\n\n选择本地文件后会在自定义容器内预览。"], "welcome.txt", {
       type: "text/plain"
     })
   ]);
@@ -34,6 +36,8 @@ function App() {
       videoPlugin(),
       audioPlugin(),
       pdfPlugin({ workerSrc: pdfWorkerSrc }),
+      epubPlugin(),
+      xpsPlugin(),
       officePlugin(),
       ofdPlugin(),
       archivePlugin(),
@@ -61,7 +65,11 @@ function App() {
             }
           }}
         />
-        <select value={theme} onChange={(event) => setTheme(event.target.value as PreviewTheme)}>
+        <select
+          aria-label="主题"
+          value={theme}
+          onChange={(event) => setTheme(event.target.value as PreviewTheme)}
+        >
           <option value="light">light</option>
           <option value="dark">dark</option>
           <option value="auto">auto</option>

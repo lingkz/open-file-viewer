@@ -9,33 +9,27 @@
     <main class="demo-shell">
       <aside class="demo-panel">
         <h1>Open File Viewer</h1>
+        <label for="file">文件</label>
         <input id="file" type="file" multiple />
-        <label>
-          宽度
-          <input id="width" value="100%" />
-        </label>
-        <label>
-          高度
-          <input id="height" value="620px" />
-        </label>
-        <label>
-          适配
-          <select id="fit">
-            <option value="contain">contain</option>
-            <option value="cover">cover</option>
-            <option value="width">width</option>
-            <option value="actual">actual</option>
-            <option value="scale-down">scale-down</option>
-          </select>
-        </label>
-        <label>
-          主题
-          <select id="theme">
-            <option value="light">light</option>
-            <option value="dark">dark</option>
-            <option value="auto">auto</option>
-          </select>
-        </label>
+        <label for="width">宽度</label>
+        <input id="width" value="100%" />
+        <label for="height">高度</label>
+        <input id="height" value="620px" />
+        <label for="fit">适配</label>
+        <select id="fit">
+          <option value="contain">contain</option>
+          <option value="cover">cover</option>
+          <option value="width">width</option>
+          <option value="height">height</option>
+          <option value="actual">actual</option>
+          <option value="scale-down">scale-down</option>
+        </select>
+        <label for="theme">主题</label>
+        <select id="theme">
+          <option value="light">light</option>
+          <option value="dark">dark</option>
+          <option value="auto">auto</option>
+        </select>
         <button id="apply">应用容器尺寸</button>
       </aside>
       <section id="viewer"></section>

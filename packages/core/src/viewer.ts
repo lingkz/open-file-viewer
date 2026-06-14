@@ -85,8 +85,7 @@ export function createViewer(options: PreviewOptions): FileViewer {
     currentInstance?.resize?.(size);
   };
 
-  const resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(container);
+  const resizeObserver = observeResize(container, resize);
 
   const renderFile = async (file: PreviewFile) => {
     const token = (renderToken += 1);
@@ -118,7 +117,9 @@ export function createViewer(options: PreviewOptions): FileViewer {
       }
       currentInstance = nextInstance;
       setLoading(false);
-      toolbar?.setCommandSupport(Boolean(nextInstance.command));
+      toolbar?.setCommandSupport((command) =>
+        Boolean(nextInstance.command) && (nextInstance.canCommand ? nextInstance.canCommand(command) : true)
+      );
       options.onLoad?.(file);
       resize();
     } catch (error) {
@@ -146,11 +147,8 @@ export function createViewer(options: PreviewOptions): FileViewer {
         return;
       }
       if (file !== undefined) {
-        queue.splice(currentIndex, 1, {
-          file,
-          fileName: options.fileName,
-          mimeType: options.mimeType
-        });
+        const currentItem = queue[currentIndex];
+        queue.splice(currentIndex, 1, createReloadItem(file, currentItem, options));
       }
       await renderQueueItem(currentIndex);
     },
@@ -168,7 +166,7 @@ export function createViewer(options: PreviewOptions): FileViewer {
     destroy() {
       destroyed = true;
       renderToken += 1;
-      resizeObserver.disconnect();
+      resizeObserver.destroy();
       currentInstance?.destroy();
       toolbar?.destroy();
       theme.destroy();
@@ -207,6 +205,21 @@ function isPreviewItem(item: PreviewSource | PreviewItem): item is PreviewItem {
   return typeof item === "object" && item !== null && "file" in item;
 }
 
+function createReloadItem(
+  file: PreviewSource,
+  currentItem: PreviewItem | undefined,
+  options: PreviewOptions
+): PreviewItem {
+  if (typeof File !== "undefined" && file instanceof File) {
+    return { file };
+  }
+  return {
+    file,
+    fileName: currentItem?.fileName || options.fileName,
+    mimeType: currentItem?.mimeType || options.mimeType
+  };
+}
+
 function clampIndex(index: number, length: number): number {
   if (length <= 0) {
     return 0;
@@ -229,17 +242,63 @@ function applyTheme(
 
   setThemeClass();
   if (theme === "auto") {
-    media?.addEventListener("change", setThemeClass);
+    addMediaListener(media, setThemeClass);
   }
 
   return {
     destroy() {
       if (theme === "auto") {
-        media?.removeEventListener("change", setThemeClass);
+        removeMediaListener(media, setThemeClass);
       }
       container.classList.remove(...classes);
     }
   };
+}
+
+function observeResize(element: HTMLElement, callback: () => void): { destroy: () => void } {
+  if (typeof ResizeObserver !== "undefined") {
+    const observer = new ResizeObserver(callback);
+    observer.observe(element);
+    return {
+      destroy() {
+        observer.disconnect();
+      }
+    };
+  }
+
+  window.addEventListener("resize", callback);
+  return {
+    destroy() {
+      window.removeEventListener("resize", callback);
+    }
+  };
+}
+
+type CompatibleMediaQueryList = MediaQueryList & {
+  addListener?: (listener: () => void) => void;
+  removeListener?: (listener: () => void) => void;
+};
+
+function addMediaListener(media: CompatibleMediaQueryList | undefined, listener: () => void): void {
+  if (!media) {
+    return;
+  }
+  if (typeof media.addEventListener === "function") {
+    media.addEventListener("change", listener);
+    return;
+  }
+  media.addListener?.(listener);
+}
+
+function removeMediaListener(media: CompatibleMediaQueryList | undefined, listener: () => void): void {
+  if (!media) {
+    return;
+  }
+  if (typeof media.removeEventListener === "function") {
+    media.removeEventListener("change", listener);
+    return;
+  }
+  media.removeListener?.(listener);
 }
 
 function createToolbar(
@@ -255,7 +314,7 @@ function createToolbar(
   | {
       element: HTMLElement;
       update: (file: PreviewFile, index: number, length: number) => void;
-      setCommandSupport: (supported: boolean) => void;
+      setCommandSupport: (isSupported: (command: PreviewCommand) => boolean) => void;
       destroy: () => void;
     }
   | undefined {
@@ -277,9 +336,11 @@ function createToolbar(
   let queueLabel: HTMLSpanElement | undefined;
   let previousButton: HTMLButtonElement | undefined;
   let nextButton: HTMLButtonElement | undefined;
-  const commandButtons: HTMLButtonElement[] = [];
+  const commandButtons: Array<{ button: HTMLButtonElement; command: PreviewCommand }> = [];
   const disposers: Array<() => void> = [];
   const search = createSearchController(viewport);
+  let searchInput: HTMLInputElement | undefined;
+  let searchCount: HTMLSpanElement | undefined;
 
   const addButton = (label: string, title: string, action: () => void, className?: string) => {
     const button = document.createElement("button");
@@ -324,7 +385,7 @@ function createToolbar(
       queue.command(command);
     });
     button.disabled = true;
-    commandButtons.push(button);
+    commandButtons.push({ button, command });
   };
 
   if (options.zoom) {
@@ -359,25 +420,27 @@ function createToolbar(
   }
 
   if (options.search !== false) {
-    const searchGroup = document.createElement("label");
+    const searchGroup = document.createElement("div");
     searchGroup.className = "ofv-toolbar-search";
     searchGroup.title = "Search preview text";
-    const searchInput = document.createElement("input");
-    searchInput.type = "search";
-    searchInput.placeholder = "Search";
-    searchInput.setAttribute("aria-label", "Search preview text");
-    const searchCount = document.createElement("span");
-    searchCount.className = "ofv-toolbar-search-count";
+    const nextSearchInput = document.createElement("input");
+    nextSearchInput.type = "search";
+    nextSearchInput.placeholder = "Search";
+    nextSearchInput.setAttribute("aria-label", "Search preview text");
+    const nextSearchCount = document.createElement("span");
+    nextSearchCount.className = "ofv-toolbar-search-count";
+    searchInput = nextSearchInput;
+    searchCount = nextSearchCount;
 
     const runSearch = () => {
-      const count = search.search(searchInput.value);
-      searchCount.textContent = searchInput.value ? String(count) : "";
+      const count = search.search(nextSearchInput.value);
+      nextSearchCount.textContent = nextSearchInput.value ? String(count) : "";
     };
 
-    searchInput.addEventListener("input", runSearch);
-    searchGroup.append(searchInput, searchCount);
+    nextSearchInput.addEventListener("input", runSearch);
+    searchGroup.append(nextSearchInput, nextSearchCount);
     element.append(searchGroup);
-    disposers.push(() => searchInput.removeEventListener("input", runSearch));
+    disposers.push(() => nextSearchInput.removeEventListener("input", runSearch));
   }
 
   return {
@@ -385,7 +448,13 @@ function createToolbar(
     update(nextFile, index, length) {
       file = nextFile;
       search.clear();
-      commandButtons.forEach((button) => {
+      if (searchInput) {
+        searchInput.value = "";
+      }
+      if (searchCount) {
+        searchCount.textContent = "";
+      }
+      commandButtons.forEach(({ button }) => {
         button.disabled = true;
       });
       if (queueLabel) {
@@ -398,9 +467,9 @@ function createToolbar(
         nextButton.disabled = index >= length - 1;
       }
     },
-    setCommandSupport(supported) {
-      commandButtons.forEach((button) => {
-        button.disabled = !supported;
+    setCommandSupport(isSupported) {
+      commandButtons.forEach(({ button, command }) => {
+        button.disabled = !isSupported(command);
       });
     },
     destroy() {
@@ -419,11 +488,13 @@ function createSearchController(root: HTMLElement): {
   const markerClass = "ofv-search-match";
 
   const clear = () => {
-    const markers = [...root.querySelectorAll(`mark.${markerClass}`)];
+    const markers = collectSearchRoots(root).flatMap((searchRoot) => [
+      ...searchRoot.querySelectorAll(`mark.${markerClass}`)
+    ]);
     for (const marker of markers) {
       marker.replaceWith(document.createTextNode(marker.textContent || ""));
     }
-    root.normalize();
+    collectSearchRoots(root).forEach((searchRoot) => searchRoot.normalize());
   };
 
   const search = (query: string): number => {
@@ -433,7 +504,7 @@ function createSearchController(root: HTMLElement): {
       return 0;
     }
 
-    const textNodes = collectSearchableTextNodes(root);
+    const textNodes = collectSearchRoots(root).flatMap((searchRoot) => collectSearchableTextNodes(searchRoot));
     let count = 0;
     let firstMatch: HTMLElement | undefined;
 
@@ -467,11 +538,26 @@ function createSearchController(root: HTMLElement): {
       node.replaceWith(fragment);
     }
 
-    firstMatch?.scrollIntoView({ block: "center", inline: "nearest" });
+    firstMatch?.scrollIntoView?.({ block: "center", inline: "nearest" });
     return count;
   };
 
   return { search, clear };
+}
+
+function collectSearchRoots(root: HTMLElement): HTMLElement[] {
+  const roots = [root];
+  for (const iframe of root.querySelectorAll<HTMLIFrameElement>("iframe")) {
+    try {
+      const body = iframe.contentDocument?.body;
+      if (body) {
+        roots.push(body);
+      }
+    } catch {
+      // Cross-origin or sandboxed frames without DOM access are skipped.
+    }
+  }
+  return roots;
 }
 
 function collectSearchableTextNodes(root: HTMLElement): Text[] {
@@ -721,8 +807,13 @@ function downloadFile(file: PreviewFile): void {
   link.href = url;
   link.download = file.name;
   link.rel = "noopener";
+  link.hidden = true;
+  document.body.append(link);
   link.click();
-  window.setTimeout(() => revokeObjectUrl(url, isExternal), 0);
+  window.setTimeout(() => {
+    link.remove();
+    revokeObjectUrl(url, isExternal);
+  }, 0);
 }
 
 async function findPlugin(plugins: PreviewPlugin[], file: PreviewFile): Promise<PreviewPlugin> {

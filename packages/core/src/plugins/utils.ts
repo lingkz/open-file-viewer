@@ -72,3 +72,10 @@ export function escapeHtml(value: string): string {
 export function bytesToText(bytes: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
+
+export function resolveFormat(
+  file: Pick<PreviewFile, "extension" | "mimeType">,
+  mimeMap: Record<string, string>
+): string {
+  return file.extension || mimeMap[file.mimeType] || "";
+}

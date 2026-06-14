@@ -5,17 +5,29 @@
   "description": "Container-first file preview library for browser, React, Vue and vanilla JavaScript.",
   "type": "module",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm -r --filter './packages/**' build",
+    "build:doc": "pnpm --filter @open-file-viewer/doc build",
+    "build:examples": "pnpm -r --filter './examples/**' build",
+    "pack:check": "node scripts/check-package-exports.mjs",
     "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "check": "pnpm test && pnpm typecheck && pnpm build && pnpm build:examples && pnpm build:doc && pnpm pack:check",
+    "dev:doc": "pnpm --filter @open-file-viewer/doc dev",
     "dev:vanilla": "pnpm --filter @open-file-viewer/example-vanilla dev",
     "dev:react": "pnpm --filter @open-file-viewer/example-react dev",
     "dev:vue": "pnpm --filter @open-file-viewer/example-vue dev"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/vue": "^8.1.0",
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
+    "@vue/test-utils": "^2.4.11",
+    "jsdom": "^29.1.1",
+    "react-dom": "^18.3.1",
     "tsup": "^8.3.5",
-    "vite": "^6.0.3"
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^4.1.8"
   },
   "packageManager": "pnpm@9.15.0"
 }

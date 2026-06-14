@@ -13,19 +13,26 @@ const videoExtensions = new Set([
   "flv",
   "wmv",
   "3gp",
-  "ts",
   "m3u8"
 ]);
+const videoMimeTypes = new Set([
+  "application/vnd.apple.mpegurl",
+  "application/x-mpegurl",
+  "application/mpegurl",
+  "application/dash+xml"
+]);
+const hlsMimeTypes = new Set(["application/vnd.apple.mpegurl", "application/x-mpegurl", "application/mpegurl"]);
 
 export function videoPlugin(): PreviewPlugin {
   return {
     name: "video",
     match(file) {
-      return file.mimeType.startsWith("video/") || videoExtensions.has(file.extension);
+      return file.mimeType.startsWith("video/") || videoMimeTypes.has(file.mimeType) || videoExtensions.has(file.extension);
     },
     async render(ctx) {
       const url = createObjectUrl(ctx.file);
       const isExternal = Boolean(ctx.file.url);
+      const mimeType = ctx.file.mimeType.toLowerCase();
       
       const container = document.createElement("div");
       container.className = "ofv-video-container";
@@ -44,6 +51,12 @@ export function videoPlugin(): PreviewPlugin {
 
       let hlsInstance: any = null;
       let mpegtsPlayer: any = null;
+      const ext = ctx.file.extension.toLowerCase();
+      const isHls = ext === "m3u8" || hlsMimeTypes.has(mimeType);
+      const isMpegTs = mimeType === "video/mp2t";
+      const isDash = mimeType === "application/dash+xml";
+      const isFlv = ext === "flv" || mimeType === "video/x-flv";
+      const formatLabel = (ctx.file.extension || ctx.file.mimeType || "video").toUpperCase();
 
       const showTranscodeFallback = () => {
         video.style.display = "none";
@@ -59,7 +72,7 @@ export function videoPlugin(): PreviewPlugin {
         fallback.className = "ofv-fallback";
         
         const title = document.createElement("strong");
-        title.textContent = `当前浏览器不支持直接播放该视频格式 (.${ctx.file.extension.toUpperCase()})`;
+        title.textContent = `当前浏览器不支持直接播放该视频格式 (${formatLabel})`;
         
         const meta = document.createElement("span");
         meta.textContent = "建议转换为 MP4 格式播放，或直接下载在本地播放。";
@@ -73,13 +86,16 @@ export function videoPlugin(): PreviewPlugin {
         container.append(fallback);
       };
 
-      video.addEventListener("error", () => {
+      const onVideoError = () => {
         showTranscodeFallback();
-      });
+      };
+
+      video.addEventListener("error", onVideoError);
 
       try {
-        const ext = ctx.file.extension.toLowerCase();
-        if (ext === "m3u8") {
+        if (isDash) {
+          showTranscodeFallback();
+        } else if (isHls) {
           const Hls = (await import("hls.js")).default;
           if (Hls.isSupported()) {
             hlsInstance = new Hls();
@@ -95,11 +111,11 @@ export function videoPlugin(): PreviewPlugin {
           } else {
             showTranscodeFallback();
           }
-        } else if (ext === "flv" || ext === "ts") {
+        } else if (isFlv || isMpegTs) {
           const mpegts = (await import("mpegts.js")).default;
           if (mpegts.isSupported()) {
             mpegtsPlayer = mpegts.createPlayer({
-              type: ext === "flv" ? "flv" : "mpegts",
+              type: isFlv ? "flv" : "mpegts",
               url: url
             });
             mpegtsPlayer.attachMediaElement(video);
@@ -124,6 +140,7 @@ export function videoPlugin(): PreviewPlugin {
           video.style.height = "100%";
         },
         destroy() {
+          video.removeEventListener("error", onVideoError);
           video.pause();
           
           if (hlsInstance) {

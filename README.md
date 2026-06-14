@@ -13,7 +13,7 @@
 
 ## 项目状态
 
-当前是可迭代的 MVP 骨架，已经包含：
+当前已经进入多格式基础预览阶段，包含：
 
 - `@open-file-viewer/core`
 - `@open-file-viewer/react`
@@ -21,7 +21,9 @@
 - Vanilla 示例
 - React 示例
 - Vue 示例
-- 图片、视频、音频、文本、PDF、fallback 插件
+- 图片、视频、音频、文本、PDF、Office、OFD、压缩包、邮件、绘图、CAD、GIS、3D 模型、fallback 插件
+- 基础工具栏、主题、多文件队列、打印、搜索、按扩展名/MIME 类型识别
+- Vitest 测试、类型检查、packages build、examples build 和 package export 校验脚本
 
 ## 安装
 
@@ -56,7 +58,12 @@ import {
   videoPlugin,
   audioPlugin,
   textPlugin,
-  pdfPlugin
+  pdfPlugin,
+  epubPlugin,
+  xpsPlugin,
+  officePlugin,
+  archivePlugin,
+  emailPlugin
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
@@ -73,7 +80,12 @@ const viewer = createViewer({
     videoPlugin(),
     audioPlugin(),
     textPlugin(),
-    pdfPlugin({ workerSrc: pdfWorkerSrc })
+    pdfPlugin({ workerSrc: pdfWorkerSrc }),
+    epubPlugin(),
+    xpsPlugin(),
+    officePlugin(),
+    archivePlugin(),
+    emailPlugin()
   ]
 });
 
@@ -89,7 +101,8 @@ import {
   videoPlugin,
   audioPlugin,
   textPlugin,
-  pdfPlugin
+  pdfPlugin,
+  officePlugin
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import { FileViewer } from "@open-file-viewer/react";
@@ -100,7 +113,8 @@ const plugins = [
   videoPlugin(),
   audioPlugin(),
   textPlugin(),
-  pdfPlugin({ workerSrc: pdfWorkerSrc })
+  pdfPlugin({ workerSrc: pdfWorkerSrc }),
+  officePlugin()
 ];
 
 export function AttachmentPreview({ file }: { file: File }) {
@@ -126,7 +140,8 @@ import {
   videoPlugin,
   audioPlugin,
   textPlugin,
-  pdfPlugin
+  pdfPlugin,
+  officePlugin
 } from "@open-file-viewer/core";
 import "@open-file-viewer/core/style.css";
 import { OpenFileViewer } from "@open-file-viewer/vue";
@@ -141,7 +156,8 @@ const plugins = [
   videoPlugin(),
   audioPlugin(),
   textPlugin(),
-  pdfPlugin({ workerSrc: pdfWorkerSrc })
+  pdfPlugin({ workerSrc: pdfWorkerSrc }),
+  officePlugin()
 ];
 </script>
 
@@ -239,11 +255,13 @@ export function customPlugin(): PreviewPlugin {
 | 插件 | 格式 |
 | --- | --- |
 | `imagePlugin()` | `jpg`, `jpeg`, `png`, `gif`, `webp`, `avif`, `svg`, `bmp`, `ico`, `tif`, `tiff`, `apng`, `heic`, `heif` |
-| `videoPlugin()` | `mp4`, `webm`, `ogg`, `ogv`, `mov`, `m4v`, `avi`, `mkv`, `flv`, `wmv`, `3gp`, `ts`, `m3u8` |
+| `videoPlugin()` | `mp4`, `webm`, `ogg`, `ogv`, `mov`, `m4v`, `avi`, `mkv`, `flv`, `wmv`, `3gp`, `m3u8`, `video/mp2t` |
 | `audioPlugin()` | `mp3`, `wav`, `ogg`, `oga`, `aac`, `m4a`, `flac`, `opus`, `weba`, `amr`, `wma` |
 | `textPlugin()` | `txt`, `log`, `json`, `xml`, `yaml`, `yml`, `csv`, `md`, `markdown`, `js`, `ts`, `tsx`, `jsx`, `vue`, `css`, `html`, `java`, `py`, `go`, `rs`, `php`, `c`, `cpp`, `h`, `hpp`, `cs`, `sql`, `sh`, `diff`, `patch` |
 | `pdfPlugin()` | `pdf` |
-| `officePlugin()` | `docx`, `doc`, `dotx`, `dot`, `rtf`, `odt`, `fodt`, `wps`, `xlsx`, `xls`, `xlsm`, `xlsb`, `csv`, `tsv`, `ods`, `fods`, `numbers`, `et`, `pptx`, `ppt`, `pps`, `ppsx`, `odp`, `fodp`, `key`, `dps` |
+| `epubPlugin()` | `epub` |
+| `xpsPlugin()` | `xps`, `oxps` |
+| `officePlugin()` | `docx`, `docm`, `doc`, `dotx`, `dotm`, `dot`, `rtf`, `odt`, `fodt`, `wps`, `xlsx`, `xls`, `xlsm`, `xlsb`, `xltx`, `xltm`, `csv`, `tsv`, `ods`, `fods`, `numbers`, `et`, `pptx`, `pptm`, `ppt`, `pps`, `ppsx`, `ppsm`, `potx`, `potm`, `odp`, `fodp`, `key`, `dps` |
 | `ofdPlugin()` | `ofd` |
 | `archivePlugin()` | `zip`, `rar`, `7z`, `tar`, `gz`, `tgz`, `bz2`, `xz` |
 | `emailPlugin()` | `eml`, `msg`, `mbox` |
@@ -255,8 +273,8 @@ export function customPlugin(): PreviewPlugin {
 注意：扩展名在列表里不代表所有格式都已经高保真还原。当前版本已经让这些格式进入容器内对应插件路径，但复杂格式会分为不同能力级别：
 
 - 原生预览：图片、视频、音频、文本、PDF。
-- 基础解析预览：`docx`、`rtf`、`odt/fodt`、`xlsx/xls/csv/ods`、`pptx/ppsx`、`odp/fodp`、`ofd`、`zip`、`eml`、`drawio`、`excalidraw`、`dxf`、`gltf/glb/obj/stl`。
-- 已识别但需要增强：`doc`、`ppt`、`dwg`、`msg`、`rar/7z`、`numbers/key`、`wps/et/dps`、`fbx/dae/ply/3mf` 等建议后续接入 WASM、专用解析器或服务端转换。
+- 基础/版式解析预览：`docx/docm/dotx/dotm`、`rtf`、`odt/fodt`、`xlsx/xls/xlsm/xlsb/xltx/xltm/csv/tsv/ods/fods`、`pptx/pptm/ppsx/ppsm/potx/potm`、`odp/fodp`、`wps/et/dps` 兼容包、`numbers/key` 包结构、`ofd/epub/xps`、`zip/tar/gz/tgz`、`eml/mbox/msg`、`drawio`、`excalidraw/tldraw`、`dxf`、`geojson/topojson/kml/kmz/gpx/shp`、`gltf/glb/obj/stl`。
+- 已识别但需要增强：`doc`、`ppt`、`dwg/dwf`、`rar/7z/bz2/xz`、`numbers/key` IWA 内容、`wps/et/dps` 高保真还原、`fbx/dae/ply/3mf` 等建议后续接入 WASM、专用解析器或服务端转换。
 
 视频、音频能否播放还取决于浏览器支持的容器和编码格式。`heic/heif`、`avi/mkv/flv/wmv` 等格式通常需要浏览器支持、转码或后续插件增强。
 
@@ -319,7 +337,7 @@ export function customPlugin(): PreviewPlugin {
 - [x] `flv`
 - [x] `wmv`
 - [x] `3gp`
-- [x] `ts`
+- [x] `video/mp2t`
 - [x] `m3u8`
 - [x] HLS 播放增强
 - [x] 视频转码 fallback
@@ -335,8 +353,9 @@ export function customPlugin(): PreviewPlugin {
 - [x] `flac`
 - [x] `opus`
 - [x] `weba`
-- [ ] `amr`
-- [ ] `wma`
+- [x] `amr`
+- [x] `wma`
+- [x] 音频播放失败下载 fallback
 
 ### PDF / 版式文档
 
@@ -348,22 +367,26 @@ export function customPlugin(): PreviewPlugin {
 - [x] PDF 搜索
 - [x] PDF 选择复制
 - [x] `ofd` 基础文本和结构预览
-- [ ] `ofd` 版式渲染
-- [ ] `xps`
-- [ ] `epub`
+- [x] `ofd` 轻量文本版式预览
+- [x] `ofd` 轻量矢量、直线和图片版式预览
+- [ ] `ofd` 高保真版式渲染
+- [x] `xps`
+- [x] `epub`
 
 ### Word 文档
 
-- [x] `docx` 基础 HTML 预览
+- [x] `docx` 版式预览
+- [x] `docm` 版式预览
 - [x] `dotx` 基础 HTML 预览
-- [ ] `doc`
-- [ ] `dot`
+- [x] `dotm` 基础 HTML 预览
+- [x] `doc` 基础二进制文本指纹预览
+- [x] `dot` 基础二进制文本指纹预览
 - [x] `rtf`
 - [x] `odt`
 - [x] `fodt`
-- [ ] `wps`
+- [x] `wps` 兼容包识别和基础预览
 - [x] Word 图片基础预览
-- [ ] Word 复杂样式高保真
+- [x] Word 复杂样式高保真增强
 - [x] Word 页眉页脚
 - [x] Word 批注
 
@@ -373,28 +396,35 @@ export function customPlugin(): PreviewPlugin {
 - [x] `xls`
 - [x] `xlsm`
 - [x] `xlsb`
+- [x] `xltx`
+- [x] `xltm`
 - [x] `csv`
 - [x] `tsv`
 - [x] `ods`
-- [ ] `fods`
-- [ ] `numbers`
-- [ ] `et`
+- [x] `fods`
+- [x] `numbers` 包结构识别
+- [x] `et` 兼容包识别和基础预览
 - [x] 表格冻结行列
 - [x] 表格公式展示
-- [ ] 表格图表预览
-- [ ] 大表格虚拟滚动
+- [x] 表格图表基础预览
+- [x] 大表格窗口化预览
 
 ### 演示文稿
 
 - [x] `pptx` 文本提取预览
+- [x] `pptm` 文本提取预览
 - [x] `ppsx` 文本提取预览
-- [ ] `ppt`
-- [ ] `pps`
+- [x] `ppsm` 文本提取预览
+- [x] `potx` 文本提取预览
+- [x] `potm` 文本提取预览
+- [x] `ppt` 基础二进制文本指纹预览
+- [x] `pps` 基础二进制文本指纹预览
 - [x] `odp`
 - [x] `fodp`
-- [ ] `key`
-- [ ] `dps`
+- [x] `key` 包结构识别
+- [x] `dps` 兼容包识别和基础预览
 - [x] PPT 图片预览
+- [x] PPT 布局/备注/切换/动画信息预览
 - [ ] PPT 布局还原
 - [ ] PPT 动画预览
 
@@ -435,20 +465,21 @@ export function customPlugin(): PreviewPlugin {
 - [x] `patch`
 - [x] Markdown 渲染增强
 - [x] 代码高亮
-- [ ] Monaco 代码预览
+- [x] 轻量代码阅读器（行号、复制、下载、换行、大文件保护）
+- [x] Monaco 代码预览（可选按需加载，支持阅读器/编辑器切换）
 
 ### CAD / 图纸
 
 - [x] `dxf` 的 `LINE` / `CIRCLE` 基础 SVG 渲染
-- [ ] `dwg`
-- [ ] `dwf`
-- [ ] `step`
-- [ ] `stp`
-- [ ] `iges`
-- [ ] `igs`
+- [x] `dwg` 元信息和转换提示
+- [x] `dwf` 元信息和转换提示
+- [x] `step` 结构预览
+- [x] `stp` 结构预览
+- [x] `iges` 结构预览
+- [x] `igs` 结构预览
 - [x] DXF 更多图元
 - [x] 图纸缩放工具
-- [ ] 图层开关
+- [x] 图层开关
 
 ### 3D 模型
 
@@ -456,13 +487,13 @@ export function customPlugin(): PreviewPlugin {
 - [x] `glb`
 - [x] `obj`
 - [x] `stl`
-- [ ] `fbx`
-- [ ] `dae`
-- [ ] `ply`
-- [ ] `3mf`
+- [x] `fbx` 格式识别和基础占位
+- [x] `dae` 格式识别和基础占位
+- [x] `ply` 格式识别和基础占位
+- [x] `3mf` 格式识别和基础占位
 - [x] OrbitControls 旋转缩放
-- [ ] 模型材质贴图增强
-- [ ] 模型测量工具
+- [x] 模型材质贴图基础增强
+- [x] 模型测量工具
 
 ### 邮件
 
@@ -478,8 +509,14 @@ export function customPlugin(): PreviewPlugin {
 - [x] `excalidraw` 基础 SVG 预览
 - [x] `drawio` 内容提取预览
 - [x] `dio` 内容提取预览
-- [ ] `tldraw`
-- [ ] Draw.io 图形还原
+- [x] `tldraw`
+- [x] Draw.io 基础图形还原
+- [x] Draw.io 常见图形和 HTML 标签还原增强
+- [x] Draw.io 图片、Actor、Document、Triangle、Process 和文本样式增强
+- [ ] Draw.io 完整图形还原
+- [x] Excalidraw 常用样式还原
+- [x] Excalidraw 填充纹理、箭头和文本对齐增强
+- [x] Excalidraw Frame、Image、Embeddable 占位和安全图片预览
 - [ ] Excalidraw 完整样式还原
 
 ### 压缩包
@@ -502,7 +539,7 @@ export function customPlugin(): PreviewPlugin {
 - [x] `kml`
 - [x] `kmz`
 - [x] `gpx`
-- [x] `shp`
+- [x] `shp` 原始文件提示和压缩包联动入口
 
 ## 建议支持范围
 
@@ -520,22 +557,21 @@ js ts jsx tsx vue html css scss less java py go rs php c cpp h hpp cs sql sh dif
 ### 第二阶段：已进入基础解析预览
 
 ```txt
-docx xlsx xlsm xlsb ods pptx
-ofd epub zip eml drawio excalidraw
-gltf glb obj stl geojson kml gpx
+docx docm dotx dotm xlsx xls xlsm xlsb xltx xltm ods pptx pptm ppsx ppsm potx potm
+ofd zip tar gz tgz eml mbox msg drawio excalidraw dxf
+gltf glb obj stl geojson topojson kml kmz gpx shp
 ```
 
 ### 第三阶段：已识别，建议服务端转换或专用引擎增强
 
 ```txt
-doc xls ppt
-dwg
+doc ppt
+dwg dwf step stp iges igs
 wps et dps
 numbers key
-msg
 heic heif
 avi mkv flv wmv 3gp
-rar 7z
+rar 7z bz2 xz
 ```
 
 ## 迭代路线
@@ -568,7 +604,7 @@ rar 7z
 
 ### 0.4.0：国内业务格式增强
 
-- OFD 版式渲染
+- OFD 高保真版式渲染
 - DXF 更多图元
 - EML 附件和 HTML 正文
 - ZIP 内文件联动预览
@@ -593,8 +629,27 @@ rar 7z
 
 ```bash
 pnpm install
+pnpm check
 pnpm build
 pnpm dev:vanilla
+```
+
+`pnpm check` 会依次执行：
+
+- `pnpm test`：Vitest 单元测试。
+- `pnpm typecheck`：core/react/vue 类型检查。
+- `pnpm build`：core/react/vue 发布包构建。
+- `pnpm build:examples`：vanilla/react/vue 示例生产构建。
+- `pnpm pack:check`：校验发布包 `exports`、`main`、`module`、`types` 指向的 dist 文件真实存在。
+
+也可以按需单独执行：
+
+```bash
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm build:examples
+pnpm pack:check
 ```
 
 React 示例：

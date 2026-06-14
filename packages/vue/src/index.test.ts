@@ -1,0 +1,102 @@
+import { render, screen, waitFor } from "@testing-library/vue";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { PreviewPlugin } from "@open-file-viewer/core";
+import { OpenFileViewer } from "./index";
+
+describe("OpenFileViewer Vue adapter", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.restoreAllMocks();
+  });
+
+  it("recreates the core viewer when plugins change", async () => {
+    const firstDestroy = vi.fn();
+    const secondDestroy = vi.fn();
+    const firstPlugin = createPlugin("first", firstDestroy);
+    const secondPlugin = createPlugin("second", secondDestroy);
+
+    const view = render(OpenFileViewer, {
+      props: {
+        file: new Blob(["demo"], { type: "text/plain" }),
+        fileName: "demo.txt",
+        plugins: [firstPlugin]
+      }
+    });
+
+    expect(await screen.findByText("first:demo.txt")).toBeTruthy();
+
+    await view.rerender({
+      file: new Blob(["demo"], { type: "text/plain" }),
+      fileName: "demo.txt",
+      plugins: [secondPlugin]
+    });
+
+    await waitFor(() => expect(firstDestroy).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("second:demo.txt")).toBeTruthy();
+
+    view.unmount();
+    expect(secondDestroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes fallback callbacks through to the core viewer", async () => {
+    const unsupported = vi.fn();
+
+    render(OpenFileViewer, {
+      props: {
+        file: new Blob(["unknown"], { type: "application/octet-stream" }),
+        fileName: "unknown.bin",
+        fallback: "inline",
+        onUnsupported: unsupported
+      }
+    });
+
+    await waitFor(() => expect(unsupported).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("当前文件暂不支持在线预览")).toBeTruthy();
+  });
+
+  it("applies and cleans the className style hook", async () => {
+    const view = render(OpenFileViewer, {
+      props: {
+        file: new Blob(["demo"], { type: "text/plain" }),
+        fileName: "demo.txt",
+        plugins: [createPlugin("styled", vi.fn())],
+        className: "viewer-shell"
+      }
+    });
+
+    expect(await screen.findByText("styled:demo.txt")).toBeTruthy();
+
+    const root = view.container.firstElementChild as HTMLElement;
+    expect(root.classList.contains("viewer-shell")).toBe(true);
+
+    view.unmount();
+    expect(root.classList.contains("viewer-shell")).toBe(false);
+  });
+
+  it("emits unsupported when no prop callback is provided", async () => {
+    const view = render(OpenFileViewer, {
+      props: {
+        file: new Blob(["unknown"], { type: "application/octet-stream" }),
+        fileName: "unknown.bin",
+        fallback: "inline"
+      }
+    });
+
+    await screen.findByText("当前文件暂不支持在线预览");
+
+    expect(view.emitted().unsupported).toHaveLength(1);
+  });
+});
+
+function createPlugin(name: string, destroy: () => void): PreviewPlugin {
+  return {
+    name,
+    match: () => true,
+    render(ctx) {
+      const element = document.createElement("div");
+      element.textContent = `${name}:${ctx.file.name}`;
+      ctx.viewport.append(element);
+      return { destroy };
+    }
+  };
+}

@@ -4,6 +4,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    chunkSizeWarningLimit: 2500
+  },
   resolve: {
     alias: {
       "@open-file-viewer/core/style.css": fileURLToPath(

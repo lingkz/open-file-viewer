@@ -28,7 +28,8 @@ export function FileViewer({
       ...options,
       container: containerRef.current,
       width,
-      height
+      height,
+      className
     });
 
     return () => {
@@ -41,8 +42,15 @@ export function FileViewer({
     options.fileName,
     options.mimeType,
     options.fit,
+    options.plugins,
+    options.fallback,
+    options.renderFallback,
     options.toolbar,
     options.theme,
+    options.onLoad,
+    options.onError,
+    options.onUnsupported,
+    className,
     width,
     height
   ]);
