@@ -78,6 +78,10 @@ export function cadPlugin(): PreviewPlugin {
         renderIges(panel, await readTextFile(ctx.file), extension);
         return { destroy: () => panel.remove() };
       }
+      if (extension === "ifc") {
+        renderIfc(panel, await readTextFile(ctx.file));
+        return { destroy: () => panel.remove() };
+      }
       if (extension === "dwg" || extension === "dwf") {
         renderBinaryCad(panel, await readArrayBuffer(ctx.file), extension, ctx.file.name);
         return { destroy: () => panel.remove() };
@@ -158,6 +162,40 @@ function renderIges(panel: HTMLElement, text: string, extension: string): void {
   panel.append(section);
 }
 
+function renderIfc(panel: HTMLElement, text: string): void {
+  const records = parseStepRecords(text);
+  const typeCounts = countBy(records.map((record) => record.type));
+  const section = createSection("IFC BIM 结构预览");
+  const note = document.createElement("p");
+  note.textContent = "当前版本提取 IFC STEP 实体、BIM 层级和常见构件统计。几何网格、材质和属性集可后续接入 IfcOpenShell/IFC.js 增强。";
+
+  const meta = document.createElement("div");
+  meta.className = "ofv-cad-summary";
+  appendMeta(meta, "实体", records.length);
+  appendMeta(meta, "类型", typeCounts.size);
+  appendMeta(meta, "项目", typeCounts.get("IFCPROJECT") || 0);
+  appendMeta(meta, "建筑", typeCounts.get("IFCBUILDING") || 0);
+  appendMeta(meta, "楼层", typeCounts.get("IFCBUILDINGSTOREY") || 0);
+  appendMeta(meta, "空间", typeCounts.get("IFCSPACE") || 0);
+  appendMeta(meta, "构件", countIfcElements(typeCounts));
+  section.append(note, meta, createCadTypeList(typeCounts, "IFC 实体统计"));
+
+  const hierarchy = createIfcHierarchy(records);
+  if (hierarchy) {
+    section.append(hierarchy);
+  }
+
+  const table = createCadEntityTable(
+    records.slice(0, 240).map((record) => ({
+      id: record.id,
+      type: record.type,
+      detail: summarizeIfcRecord(record)
+    }))
+  );
+  section.append(table);
+  panel.append(section);
+}
+
 type StepRecord = {
   id: string;
   type: string;
@@ -211,8 +249,111 @@ function renderBinaryCad(panel: HTMLElement, arrayBuffer: ArrayBuffer, extension
   preview.className = "ofv-text-block";
   preview.textContent = hexPreview(bytes);
 
-  section.append(note, meta, actions, preview);
+  section.append(note, meta, createBinaryCadProbe(bytes, extension), actions, preview);
   panel.append(section);
+}
+
+function createBinaryCadProbe(bytes: Uint8Array, extension: string): HTMLElement {
+  const probe = probeBinaryCad(bytes);
+  const details = document.createElement("details");
+  details.className = "ofv-details ofv-cad-binary-probe";
+  details.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = "二进制结构探测";
+  const meta = document.createElement("div");
+  meta.className = "ofv-archive-probe-meta";
+  appendMeta(meta, "可读片段", probe.tokens.length);
+  appendMeta(meta, "实体关键词", formatCadKeywordCounts(probe.entityCounts));
+  appendMeta(meta, "图层线索", String(probe.layerHints.length));
+  appendMeta(meta, "块/引用线索", String(probe.blockHints.length));
+  appendMeta(meta, "外部引用", String(probe.externalRefs.length));
+  appendMeta(meta, "解析级别", extension === "dwg" ? "启发式扫描" : "容器/文本扫描");
+  details.append(summary, meta);
+
+  const hints = [...probe.layerHints, ...probe.blockHints, ...probe.externalRefs].slice(0, 18);
+  if (hints.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "ofv-cad-probe-list";
+    for (const hint of hints) {
+      const item = document.createElement("li");
+      item.textContent = hint;
+      list.append(item);
+    }
+    details.append(list);
+  }
+
+  if (probe.tokens.length > 0) {
+    const preview = document.createElement("pre");
+    preview.className = "ofv-text-block";
+    preview.textContent = probe.tokens.slice(0, 80).join("\n");
+    details.append(preview);
+  }
+  return details;
+}
+
+type BinaryCadProbe = {
+  tokens: string[];
+  entityCounts: Map<string, number>;
+  layerHints: string[];
+  blockHints: string[];
+  externalRefs: string[];
+};
+
+function probeBinaryCad(bytes: Uint8Array): BinaryCadProbe {
+  const text = extractAsciiRuns(bytes.slice(0, Math.min(bytes.length, 65536)));
+  const tokens = text
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 3)
+    .slice(0, 240);
+  const entityKeywords = ["LINE", "CIRCLE", "ARC", "LWPOLYLINE", "POLYLINE", "TEXT", "MTEXT", "INSERT", "BLOCK", "LAYER", "XREF", "DIMENSION"];
+  const entityCounts = new Map<string, number>();
+  for (const token of tokens) {
+    const normalized = token.toUpperCase();
+    for (const keyword of entityKeywords) {
+      if (normalized.includes(keyword)) {
+        entityCounts.set(keyword, (entityCounts.get(keyword) || 0) + 1);
+      }
+    }
+  }
+  return {
+    tokens,
+    entityCounts,
+    layerHints: uniqueHints(tokens.filter((item) => /layer|图层/i.test(item))),
+    blockHints: uniqueHints(tokens.filter((item) => /block|insert|块/i.test(item))),
+    externalRefs: uniqueHints(tokens.filter((item) => /xref|\.dwg|\.dxf|\.pdf|\.png|\.jpe?g/i.test(item)))
+  };
+}
+
+function extractAsciiRuns(bytes: Uint8Array): string[] {
+  const result: string[] = [];
+  let current = "";
+  for (const byte of bytes) {
+    if (byte >= 32 && byte <= 126) {
+      current += String.fromCharCode(byte);
+      continue;
+    }
+    if (current.length >= 3) {
+      result.push(current);
+    }
+    current = "";
+  }
+  if (current.length >= 3) {
+    result.push(current);
+  }
+  return result;
+}
+
+function uniqueHints(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).slice(0, 12);
+}
+
+function formatCadKeywordCounts(counts: Map<string, number>): string {
+  const text = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([type, count]) => `${type} ${count}`)
+    .join(", ");
+  return text || "未发现";
 }
 
 function parseStepRecords(text: string): StepRecord[] {
@@ -255,6 +396,105 @@ function summarizeStepRecord(record: StepRecord): string {
     return record.args.slice(0, 180);
   }
   return record.args.slice(0, 120);
+}
+
+function summarizeIfcRecord(record: StepRecord): string {
+  const strings = extractStepStrings(record.args);
+  const globalId = strings[0];
+  const name = strings[2] || strings[1];
+  const label = [globalId, name].filter(Boolean).join(" · ");
+  if (label) {
+    return label;
+  }
+  return summarizeStepRecord(record);
+}
+
+function createIfcHierarchy(records: StepRecord[]): HTMLElement | null {
+  const rows = records
+    .filter((record) => ["IFCPROJECT", "IFCSITE", "IFCBUILDING", "IFCBUILDINGSTOREY", "IFCSPACE"].includes(record.type))
+    .slice(0, 80)
+    .map((record) => ({
+      id: record.id,
+      type: ifcTypeName(record.type),
+      detail: summarizeIfcRecord(record)
+    }));
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "ofv-table-scroll ofv-cad-entities";
+  const title = document.createElement("strong");
+  title.textContent = "BIM 层级";
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const header = document.createElement("tr");
+  for (const label of ["ID", "层级", "名称"]) {
+    const cell = document.createElement("th");
+    cell.textContent = label;
+    header.append(cell);
+  }
+  thead.append(header);
+  const tbody = document.createElement("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    for (const value of [row.id, row.type, row.detail]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      tr.append(cell);
+    }
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  wrapper.append(title, table);
+  return wrapper;
+}
+
+function extractStepStrings(args: string): string[] {
+  const values: string[] = [];
+  const pattern = /'((?:''|[^'])*)'/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(args))) {
+    values.push((match[1] || "").replace(/''/g, "'"));
+  }
+  return values;
+}
+
+function countIfcElements(counts: Map<string, number>): number {
+  const elementTypes = [
+    "IFCBEAM",
+    "IFCBUILDINGELEMENTPROXY",
+    "IFCCOLUMN",
+    "IFCCOVERING",
+    "IFCCURTAINWALL",
+    "IFCDOOR",
+    "IFCFLOWSEGMENT",
+    "IFCFURNISHINGELEMENT",
+    "IFCMEMBER",
+    "IFCPLATE",
+    "IFCRAILING",
+    "IFCRAMP",
+    "IFCRAMPFLIGHT",
+    "IFCROOF",
+    "IFCSLAB",
+    "IFCSTAIR",
+    "IFCSTAIRFLIGHT",
+    "IFCWALL",
+    "IFCWALLSTANDARDCASE",
+    "IFCWINDOW"
+  ];
+  return elementTypes.reduce((sum, type) => sum + (counts.get(type) || 0), 0);
+}
+
+function ifcTypeName(type: string): string {
+  const names: Record<string, string> = {
+    IFCPROJECT: "项目",
+    IFCSITE: "场地",
+    IFCBUILDING: "建筑",
+    IFCBUILDINGSTOREY: "楼层",
+    IFCSPACE: "空间"
+  };
+  return names[type] || type;
 }
 
 function igesTypeName(type: string): string {

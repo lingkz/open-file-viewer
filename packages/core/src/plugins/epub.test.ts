@@ -24,6 +24,18 @@ describe("epubPlugin", () => {
 
     expect(container.textContent).toContain("测试书名");
     expect(container.textContent).toContain("作者 A");
+    const summary = container.querySelector(".ofv-epub-meta");
+    expect(summary?.textContent).toContain("出版方测试出版社");
+    expect(summary?.textContent).toContain("标识urn:isbn:9780000000000");
+    expect(summary?.textContent).toContain("修改时间2026-06-15T00:00:00Z");
+    expect(summary?.textContent).toContain("章节2");
+    expect(summary?.textContent).toContain("Manifest7");
+    expect(summary?.textContent).toContain("Spine2");
+    expect(summary?.textContent).toContain("导航2");
+    expect(summary?.textContent).toContain("封面1");
+    expect(summary?.textContent).toContain("图片1");
+    expect(summary?.textContent).toContain("样式1");
+    expect(summary?.textContent).toContain("字体1");
     expect(container.textContent).toContain("第一章");
     expect(container.textContent).toContain("Hello EPUB");
     expect(container.textContent).toContain("第二章");
@@ -71,11 +83,18 @@ async function createMinimalEpub(): Promise<Blob> {
         <dc:title>测试书名</dc:title>
         <dc:creator>作者 A</dc:creator>
         <dc:language>zh-CN</dc:language>
+        <dc:identifier>urn:isbn:9780000000000</dc:identifier>
+        <dc:publisher>测试出版社</dc:publisher>
+        <meta property="dcterms:modified">2026-06-15T00:00:00Z</meta>
       </metadata>
       <manifest>
         <item id="c1" href="chapters/chapter1.xhtml" media-type="application/xhtml+xml" />
         <item id="c2" href="chapters/chapter2.xhtml" media-type="application/xhtml+xml" />
-        <item id="cover" href="images/cover.png" media-type="image/png" />
+        <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
+        <item id="toc" href="toc.ncx" media-type="application/x-dtbncx+xml" />
+        <item id="style" href="styles/book.css" media-type="text/css" />
+        <item id="font" href="fonts/book.woff2" media-type="font/woff2" />
+        <item id="cover" href="images/cover.png" media-type="image/png" properties="cover-image" />
       </manifest>
       <spine>
         <itemref idref="c1" />
@@ -100,6 +119,10 @@ async function createMinimalEpub(): Promise<Blob> {
     "OPS/chapters/chapter2.xhtml",
     `<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>第二章</h1><p>Next</p></body></html>`
   );
+  zip.file("OPS/nav.xhtml", `<html xmlns="http://www.w3.org/1999/xhtml"><body><nav><ol><li>第一章</li></ol></nav></body></html>`);
+  zip.file("OPS/toc.ncx", `<ncx><navMap /></ncx>`);
+  zip.file("OPS/styles/book.css", "body { color: #111; }");
+  zip.file("OPS/fonts/book.woff2", Uint8Array.from([0x77, 0x4f, 0x46, 0x32]));
   zip.file("OPS/images/cover.png", Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]));
   return zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
 }

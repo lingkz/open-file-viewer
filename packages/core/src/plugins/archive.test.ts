@@ -117,6 +117,105 @@ describe("archivePlugin", () => {
     expect(container.textContent).toContain("格式类型：.ZIP 压缩文件");
   });
 
+  it("renders archive default summary with size, type distribution and risky paths", async () => {
+    const zip = new JSZip();
+    zip.file("docs/readme.txt", "hello");
+    zip.file("assets/photo.png", "123456789");
+    zip.file("../escape.sh", "bad");
+    zip.folder("empty");
+    const buffer = await zip.generateAsync({ type: "arraybuffer" });
+
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: buffer,
+      fileName: "bundle.zip",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-archive-summary")));
+
+    const summary = container.querySelector(".ofv-archive-summary");
+    expect(summary?.textContent).toContain("总解压大小17 B");
+    expect(summary?.textContent).toContain("最大文件assets/photo.png · 9 B");
+    expect(summary?.textContent).toContain("类型分布png 1, sh 1, txt 1");
+    expect(summary?.textContent).toContain("可预览条目3");
+    expect(summary?.textContent).toContain("风险路径1");
+  });
+
+  it("renders RAR4 header entries without falling back to unsupported copy", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: minimalRar4(),
+      fileName: "bundle.rar",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-archive-probe-table")));
+
+    expect(container.textContent).toContain("RAR 结构预览");
+    expect(container.textContent).toContain("版本：RAR4");
+    expect(container.textContent).toContain("可见条目：1");
+    expect(container.textContent).toContain("docs/readme.txt");
+    expect(container.textContent).toContain("5 B");
+    expect(container.querySelector(".ofv-fallback")).toBeNull();
+  });
+
+  it("renders 7z container header boundaries", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: minimal7z(),
+      fileName: "bundle.7z",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => container.textContent?.includes("7Z 结构预览") || false);
+
+    expect(container.textContent).toContain("版本：0.4");
+    expect(container.textContent).toContain("Next header offset：32");
+    expect(container.textContent).toContain("Next header size：16");
+    expect(container.textContent).toContain("目录和解压需要 LZMA/7z");
+    expect(container.querySelector(".ofv-fallback")).toBeNull();
+  });
+
+  it("renders bzip2 and xz stream signatures", async () => {
+    const bzContainer = document.createElement("div");
+    document.body.append(bzContainer);
+
+    createViewer({
+      container: bzContainer,
+      file: new Uint8Array([0x42, 0x5a, 0x68, 0x39, 0x31, 0x41, 0x59]).buffer,
+      fileName: "data.bz2",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => bzContainer.textContent?.includes("BZIP2 结构预览") || false);
+    expect(bzContainer.textContent).toContain("块大小：900 KB");
+    expect(bzContainer.querySelector(".ofv-fallback")).toBeNull();
+
+    const xzContainer = document.createElement("div");
+    document.body.append(xzContainer);
+
+    createViewer({
+      container: xzContainer,
+      file: new Uint8Array([0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x04]).buffer,
+      fileName: "data.xz",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => xzContainer.textContent?.includes("XZ 结构预览") || false);
+    expect(xzContainer.textContent).toContain("Stream flags：0x00 0x04");
+    expect(xzContainer.querySelector(".ofv-fallback")).toBeNull();
+  });
+
   it("renders archive entries as accessible buttons", async () => {
     const zip = new JSZip();
     zip.file("readme.txt", "hello");
@@ -304,6 +403,50 @@ describe("archivePlugin", () => {
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 });
+
+function minimalRar4(): ArrayBuffer {
+  const name = new TextEncoder().encode("docs/readme.txt");
+  const headerSize = 32 + name.length;
+  const bytes = new Uint8Array(7 + 13 + headerSize);
+  const view = new DataView(bytes.buffer);
+  bytes.set([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00], 0);
+  let offset = 7;
+  view.setUint16(offset, 0, true);
+  bytes[offset + 2] = 0x73;
+  view.setUint16(offset + 3, 0, true);
+  view.setUint16(offset + 5, 13, true);
+  view.setUint16(offset + 7, 0, true);
+  view.setUint32(offset + 9, 0, true);
+  offset += 13;
+  view.setUint16(offset, 0, true);
+  bytes[offset + 2] = 0x74;
+  view.setUint16(offset + 3, 0, true);
+  view.setUint16(offset + 5, headerSize, true);
+  view.setUint32(offset + 7, 5, true);
+  view.setUint32(offset + 11, 5, true);
+  bytes[offset + 15] = 2;
+  view.setUint32(offset + 16, 0, true);
+  bytes[offset + 20] = 0x30;
+  view.setUint32(offset + 21, 0, true);
+  view.setUint16(offset + 25, 0, true);
+  view.setUint16(offset + 26, name.length, true);
+  view.setUint32(offset + 28, 0, true);
+  bytes.set(name, offset + 32);
+  return bytes.buffer;
+}
+
+function minimal7z(): ArrayBuffer {
+  const bytes = new Uint8Array(32);
+  const view = new DataView(bytes.buffer);
+  bytes.set([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c, 0x00, 0x04], 0);
+  view.setUint32(8, 0, true);
+  view.setUint32(12, 32, true);
+  view.setUint32(16, 0, true);
+  view.setUint32(20, 16, true);
+  view.setUint32(24, 0, true);
+  view.setUint32(28, 0x12345678, true);
+  return bytes.buffer;
+}
 
 async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> {
   const start = Date.now();

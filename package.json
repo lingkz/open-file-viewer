@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Container-first file preview library for browser, React, Vue and vanilla JavaScript.",
   "type": "module",
-  "homepage": "https://xushanpei.github.io/open-file-viewer/",
+  "homepage": "https://open-file-viewer-workspace.void.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xushanpei/open-file-viewer.git"
@@ -21,6 +21,7 @@
     "test": "vitest run",
     "check": "pnpm test && pnpm typecheck && pnpm build && pnpm build:examples && pnpm build:doc && pnpm pack:check",
     "dev:doc": "pnpm --filter @open-file-viewer/doc dev",
+    "deploy:doc:void": "pnpm build:doc && void deploy --dir doc/dist --spa",
     "dev:vanilla": "pnpm --filter @open-file-viewer/example-vanilla dev",
     "dev:react": "pnpm --filter @open-file-viewer/example-react dev",
     "dev:vue": "pnpm --filter @open-file-viewer/example-vue dev"

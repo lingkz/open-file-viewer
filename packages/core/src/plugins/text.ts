@@ -475,6 +475,7 @@ export function textPlugin(): PreviewPlugin {
 
       actions.append(status, editorButton, wrapButton, copyButton, downloadButton);
       header.append(title, actions);
+      const structureSummary = createTextStructureSummary(text, ext, lang, ctx.file.mimeType);
 
       const body = document.createElement("div");
       body.className = "ofv-code-body";
@@ -586,6 +587,9 @@ export function textPlugin(): PreviewPlugin {
       });
 
       wrapper.append(header);
+      if (structureSummary) {
+        wrapper.append(structureSummary);
+      }
       if (truncated) {
         const notice = document.createElement("div");
         notice.className = "ofv-code-notice";
@@ -735,6 +739,119 @@ function countLines(text: string): number {
     return 1;
   }
   return text.split(/\r\n|\r|\n/).length;
+}
+
+function createTextStructureSummary(text: string, extension: string, language: string, mimeType: string): HTMLElement | null {
+  if (text.length > MAX_RENDER_CHARS) {
+    return null;
+  }
+  const items = summarizeTextStructure(text, extension, language, mimeType);
+  if (items.length === 0) {
+    return null;
+  }
+  const summary = document.createElement("div");
+  summary.className = "ofv-text-structure";
+  for (const item of items) {
+    const row = document.createElement("span");
+    const label = document.createElement("span");
+    label.textContent = item.label;
+    const value = document.createElement("strong");
+    value.textContent = item.value;
+    row.append(label, value);
+    summary.append(row);
+  }
+  return summary;
+}
+
+function summarizeTextStructure(
+  text: string,
+  extension: string,
+  language: string,
+  mimeType: string
+): Array<{ label: string; value: string }> {
+  if (extension === "ipynb" || mimeType === "application/x-ipynb+json") {
+    return summarizeNotebook(text);
+  }
+  if (extension === "ndjson" || extension === "jsonl" || mimeType === "application/x-ndjson") {
+    return summarizeNdjson(text);
+  }
+  if (language === "json" || language === "json5") {
+    return summarizeJson(text);
+  }
+  return [];
+}
+
+function summarizeJson(text: string): Array<{ label: string; value: string }> {
+  try {
+    const data = JSON.parse(text) as unknown;
+    if (Array.isArray(data)) {
+      return [
+        { label: "结构", value: "Array" },
+        { label: "条目", value: String(data.length) }
+      ];
+    }
+    if (data && typeof data === "object") {
+      const keys = Object.keys(data as Record<string, unknown>);
+      return [
+        { label: "结构", value: "Object" },
+        { label: "键", value: String(keys.length) },
+        { label: "预览", value: keys.slice(0, 8).join(", ") || "无键" }
+      ];
+    }
+    return [{ label: "结构", value: typeof data }];
+  } catch {
+    return [];
+  }
+}
+
+function summarizeNotebook(text: string): Array<{ label: string; value: string }> {
+  try {
+    const notebook = JSON.parse(text) as {
+      cells?: Array<{ cell_type?: string; source?: string | string[] }>;
+      metadata?: { kernelspec?: { display_name?: string; name?: string }; language_info?: { name?: string } };
+    };
+    if (!Array.isArray(notebook.cells)) {
+      return summarizeJson(text);
+    }
+    const counts = new Map<string, number>();
+    for (const cell of notebook.cells) {
+      const type = cell.cell_type || "unknown";
+      counts.set(type, (counts.get(type) || 0) + 1);
+    }
+    const kernel = notebook.metadata?.kernelspec?.display_name || notebook.metadata?.kernelspec?.name || notebook.metadata?.language_info?.name;
+    return [
+      { label: "Notebook", value: `${notebook.cells.length} cells` },
+      { label: "类型", value: [...counts.entries()].map(([type, count]) => `${type} ${count}`).join(", ") || "未知" },
+      ...(kernel ? [{ label: "Kernel", value: kernel }] : [])
+    ];
+  } catch {
+    return [];
+  }
+}
+
+function summarizeNdjson(text: string): Array<{ label: string; value: string }> {
+  const lines = text.split(/\r\n|\r|\n/).filter((line) => line.trim());
+  let parsed = 0;
+  let objects = 0;
+  let arrays = 0;
+  for (const line of lines.slice(0, 1000)) {
+    try {
+      const value = JSON.parse(line);
+      parsed++;
+      if (Array.isArray(value)) {
+        arrays++;
+      } else if (value && typeof value === "object") {
+        objects++;
+      }
+    } catch {
+      // keep counting valid rows only
+    }
+  }
+  return [
+    { label: "NDJSON", value: `${lines.length} lines` },
+    { label: "可解析", value: String(parsed) },
+    { label: "类型", value: `object ${objects}, array ${arrays}` }
+  ];
 }
 
 function createLineNumbers(lines: number): string {

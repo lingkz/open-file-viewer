@@ -51,6 +51,11 @@ describe("pdfPlugin", () => {
 
     await waitFor(() => container.querySelectorAll(".ofv-pdf-page-wrapper").length === 2);
 
+    const summary = container.querySelector(".ofv-pdf-summary");
+    expect(summary?.textContent).toContain("页数2");
+    expect(summary?.textContent).toContain("页面尺寸400 x 600 (2)");
+    expect(summary?.textContent).toContain("适配适合宽度");
+    expect(summary?.textContent).toContain("缩放100%");
     const firstWrapper = container.querySelector<HTMLElement>(".ofv-pdf-page-wrapper");
     const zoomIn = container.querySelector<HTMLButtonElement>('button[aria-label="Zoom in"]');
     const rotate = container.querySelector<HTMLButtonElement>('button[aria-label="Rotate right"]');
@@ -62,6 +67,7 @@ describe("pdfPlugin", () => {
 
     await waitFor(() => container.querySelector<HTMLElement>(".ofv-pdf-page-wrapper") !== firstWrapper);
 
+    expect(container.querySelector(".ofv-pdf-summary")?.textContent).toContain("缩放115%");
     expect(container.querySelectorAll(".ofv-pdf-page-wrapper")).toHaveLength(2);
     expect(pdfjs.GlobalWorkerOptions.workerSrc).toContain("pdf.worker.mjs");
 

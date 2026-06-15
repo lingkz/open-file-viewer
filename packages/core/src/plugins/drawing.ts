@@ -45,6 +45,127 @@ export function drawingPlugin(): PreviewPlugin {
   };
 }
 
+type DrawingSummaryItem = {
+  type: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  text?: string;
+  image?: boolean;
+  embed?: boolean;
+  edge?: boolean;
+};
+
+function createDrawingSummary(items: DrawingSummaryItem[]): HTMLElement {
+  const summary = document.createElement("div");
+  summary.className = "ofv-drawing-summary";
+  const typeCounts = countDrawingTypes(items);
+  appendDrawingSummary(summary, "对象", String(items.length));
+  appendDrawingSummary(summary, "类型", formatDrawingTypes(typeCounts));
+  appendDrawingSummary(summary, "文本", String(items.filter((item) => item.text && item.text.trim()).length));
+  appendDrawingSummary(summary, "连线", String(items.filter((item) => item.edge).length));
+  const media = items.filter((item) => item.image || item.embed).length;
+  if (media > 0) {
+    appendDrawingSummary(summary, "媒体/嵌入", String(media));
+  }
+  const bounds = drawingBounds(items);
+  if (bounds) {
+    appendDrawingSummary(summary, "范围", `${Math.round(bounds[0])}, ${Math.round(bounds[1])}, ${Math.round(bounds[2])}, ${Math.round(bounds[3])}`);
+  }
+  return summary;
+}
+
+function appendDrawingSummary(parent: HTMLElement, label: string, value: string): void {
+  const item = document.createElement("span");
+  const key = document.createElement("span");
+  key.textContent = label;
+  const content = document.createElement("strong");
+  content.textContent = value;
+  item.append(key, content);
+  parent.append(item);
+}
+
+function countDrawingTypes(items: DrawingSummaryItem[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    counts.set(item.type, (counts.get(item.type) || 0) + 1);
+  }
+  return counts;
+}
+
+function formatDrawingTypes(counts: Map<string, number>): string {
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([type, count]) => `${type} ${count}`)
+    .join(", ") || "无";
+}
+
+function drawingBounds(items: DrawingSummaryItem[]): [number, number, number, number] | undefined {
+  const boxes = items
+    .map((item) => {
+      if (!Number.isFinite(item.x) || !Number.isFinite(item.y)) {
+        return undefined;
+      }
+      const x = item.x as number;
+      const y = item.y as number;
+      const width = Math.max(0, finiteNumber(item.width, 0));
+      const height = Math.max(0, finiteNumber(item.height, 0));
+      return [x, y, x + width, y + height] as [number, number, number, number];
+    })
+    .filter((item): item is [number, number, number, number] => Boolean(item));
+  if (boxes.length === 0) {
+    return undefined;
+  }
+  return [
+    Math.min(...boxes.map((box) => box[0])),
+    Math.min(...boxes.map((box) => box[1])),
+    Math.max(...boxes.map((box) => box[2])),
+    Math.max(...boxes.map((box) => box[3]))
+  ];
+}
+
+function excalidrawSummaryItem(element: Record<string, unknown>): DrawingSummaryItem {
+  return {
+    type: String(element.type || "unknown"),
+    x: finiteNumber(element.x, 0),
+    y: finiteNumber(element.y, 0),
+    width: finiteNumber(element.width, 0),
+    height: finiteNumber(element.height, 0),
+    text: String(element.text || element.name || ""),
+    image: element.type === "image",
+    embed: element.type === "embeddable",
+    edge: element.type === "arrow" || element.type === "line"
+  };
+}
+
+function tldrawSummaryItem(shape: TldrawShape): DrawingSummaryItem {
+  const props = shape.props || {};
+  return {
+    type: String(shape.type || props.type || "unknown"),
+    x: finiteNumber(shape.x, 0),
+    y: finiteNumber(shape.y, 0),
+    width: finiteNumber(props.w, finiteNumber(props.width, 0)),
+    height: finiteNumber(props.h, finiteNumber(props.height, 0)),
+    text: String(props.text || ""),
+    edge: shape.type === "arrow" || shape.type === "line"
+  };
+}
+
+function drawioSummaryItem(shape: DrawioShape): DrawingSummaryItem {
+  return {
+    type: shape.edge ? "edge" : drawioShapeName(shape.style),
+    x: shape.x,
+    y: shape.y,
+    width: shape.width,
+    height: shape.height,
+    text: shape.value,
+    image: drawioShapeName(shape.style) === "image",
+    edge: shape.edge
+  };
+}
+
 function renderExcalidraw(panel: HTMLElement, text: string): void {
   const data = JSON.parse(text) as {
     elements?: Array<Record<string, unknown>>;
@@ -53,6 +174,7 @@ function renderExcalidraw(panel: HTMLElement, text: string): void {
   const files = data.files || {};
   const elements = (data.elements || []).filter((element) => !element.isDeleted);
   const section = createSection(`Excalidraw ${elements.length} elements`);
+  section.append(createDrawingSummary(elements.map(excalidrawSummaryItem)));
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "ofv-svg-stage");
   svg.setAttribute("viewBox", createExcalidrawViewBox(elements));
@@ -494,6 +616,7 @@ function renderTldraw(panel: HTMLElement, text: string): void {
   const data = JSON.parse(text) as unknown;
   const shapes = extractTldrawShapes(data);
   const section = createSection(`tldraw 基础预览 ${shapes.length} shapes`);
+  section.append(createDrawingSummary(shapes.map(tldrawSummaryItem)));
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "ofv-svg-stage");
   svg.setAttribute("viewBox", createTldrawViewBox(shapes));
@@ -828,6 +951,7 @@ function renderDrawio(panel: HTMLElement, text: string): void {
     const section = createSection(`Draw.io 图形预览 ${index + 1}`);
     const shapes = parseDrawioShapes(diagram);
     if (shapes.length > 0) {
+      section.append(createDrawingSummary(shapes.map(drawioSummaryItem)));
       const svg = document.createElementNS(SVG_NS, "svg");
       svg.setAttribute("class", "ofv-svg-stage");
       svg.setAttribute("viewBox", createDrawioViewBox(shapes));
@@ -1190,7 +1314,7 @@ function drawioShapeName(style: Record<string, string>): string {
   if (style.text === "1") {
     return "text";
   }
-  return "";
+  return "rectangle";
 }
 
 function renderDrawioImage(svg: SVGSVGElement, shape: DrawioShape, opacity: number, transform: string): void {

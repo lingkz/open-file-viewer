@@ -39,6 +39,7 @@ export function imagePlugin(): PreviewPlugin {
     async render(ctx) {
       const ext = ctx.file.extension.toLowerCase();
       const isHeic = ext === "heic" || ext === "heif" || heicMimeTypes.has(ctx.file.mimeType.toLowerCase());
+      const sourceBytesPromise = readImageBytes(ctx.file.blob);
 
       let url = "";
       let convertedBlob: Blob | null = null;
@@ -91,6 +92,7 @@ export function imagePlugin(): PreviewPlugin {
 
       const stage = document.createElement("div");
       stage.className = "ofv-image-stage";
+      const infoBar = createImageInfoBar(await sourceBytesPromise, ext, ctx.file.mimeType, ctx.file.name);
 
       const image = document.createElement("img");
       image.className = "ofv-media ofv-image-content";
@@ -206,7 +208,7 @@ export function imagePlugin(): PreviewPlugin {
       image.addEventListener("error", showImageFallback);
 
       stage.append(image);
-      wrapper.append(...(showInlineControls ? [controls, stage] : [stage]));
+      wrapper.append(...(showInlineControls ? [controls, stage, infoBar] : [stage, infoBar]));
       ctx.viewport.append(wrapper);
       updateTransform();
 
@@ -288,6 +290,422 @@ function createImageFallback(fileName: string, url: string): HTMLElement {
 
   fallback.append(title, meta, download);
   return fallback;
+}
+
+type ImageInfo = {
+  format: string;
+  width?: number;
+  height?: number;
+  bitDepth?: string;
+  color?: string;
+  frames?: number;
+  count?: number;
+  note?: string;
+};
+
+async function readImageBytes(blob?: Blob): Promise<Uint8Array> {
+  if (!blob) {
+    return new Uint8Array();
+  }
+  return new Uint8Array(await blob.arrayBuffer().catch(() => new ArrayBuffer(0)));
+}
+
+function createImageInfoBar(bytes: Uint8Array, extension: string, mimeType: string, fileName: string): HTMLElement {
+  const info = parseImageInfo(bytes, extension, mimeType, fileName);
+  const bar = document.createElement("div");
+  bar.className = "ofv-image-info";
+  appendImageInfo(bar, "格式", info.format);
+  if (info.width && info.height) {
+    appendImageInfo(bar, "尺寸", `${info.width} x ${info.height}px`);
+  }
+  if (info.bitDepth) {
+    appendImageInfo(bar, "位深", info.bitDepth);
+  }
+  if (info.color) {
+    appendImageInfo(bar, "颜色", info.color);
+  }
+  if (info.frames !== undefined) {
+    appendImageInfo(bar, "帧", String(info.frames));
+  }
+  if (info.count !== undefined) {
+    appendImageInfo(bar, "图像", String(info.count));
+  }
+  if (info.note) {
+    appendImageInfo(bar, "说明", info.note);
+  }
+  return bar;
+}
+
+function appendImageInfo(parent: HTMLElement, label: string, value: string): void {
+  const row = document.createElement("span");
+  row.className = "ofv-image-info-item";
+  const key = document.createElement("span");
+  key.textContent = label;
+  const content = document.createElement("strong");
+  content.textContent = value;
+  row.append(key, content);
+  parent.append(row);
+}
+
+function parseImageInfo(bytes: Uint8Array, extension: string, mimeType: string, fileName: string): ImageInfo {
+  const fallbackFormat = (extension || mimeType || fileName.split(".").pop() || "image").toUpperCase();
+  if (bytes.length === 0) {
+    return { format: fallbackFormat, note: "无法读取本地头信息" };
+  }
+  return (
+    parsePngInfo(bytes) ||
+    parseJpegInfo(bytes) ||
+    parseGifInfo(bytes) ||
+    parseWebpInfo(bytes) ||
+    parseAvifInfo(bytes) ||
+    parseBmpInfo(bytes) ||
+    parseIcoInfo(bytes) ||
+    parseSvgInfo(bytes) ||
+    { format: fallbackFormat, note: "暂未识别图片头结构" }
+  );
+}
+
+function parsePngInfo(bytes: Uint8Array): ImageInfo | null {
+  if (bytes.length < 33 || !bytesMatch(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    return null;
+  }
+  const view = dataView(bytes);
+  const frames = countPngChunks(bytes, "fcTL");
+  return {
+    format: frames > 0 ? "APNG" : "PNG",
+    width: view.getUint32(16, false),
+    height: view.getUint32(20, false),
+    bitDepth: `${bytes[24]} bit`,
+    color: pngColorType(bytes[25]),
+    frames: frames > 0 ? frames : undefined
+  };
+}
+
+function parseJpegInfo(bytes: Uint8Array): ImageInfo | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    return null;
+  }
+  let offset = 2;
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset++;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    offset += 2;
+    while (bytes[offset] === 0xff) {
+      offset++;
+    }
+    if (marker === 0xd9 || marker === 0xda) {
+      break;
+    }
+    if (offset + 2 > bytes.length) {
+      break;
+    }
+    const length = (bytes[offset] << 8) | bytes[offset + 1];
+    if (length < 2 || offset + length > bytes.length) {
+      break;
+    }
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+      return {
+        format: "JPEG",
+        width: (bytes[offset + 5] << 8) | bytes[offset + 6],
+        height: (bytes[offset + 3] << 8) | bytes[offset + 4],
+        bitDepth: `${bytes[offset + 2]} bit`,
+        color: `${bytes[offset + 7]} component`
+      };
+    }
+    offset += length;
+  }
+  return { format: "JPEG", note: "未在头部扫描到 SOF 尺寸段" };
+}
+
+function parseGifInfo(bytes: Uint8Array): ImageInfo | null {
+  const header = asciiAt(bytes, 0, 6);
+  if (header !== "GIF87a" && header !== "GIF89a") {
+    return null;
+  }
+  const packed = bytes[10] || 0;
+  return {
+    format: header,
+    width: readUint16Le(bytes, 6),
+    height: readUint16Le(bytes, 8),
+    bitDepth: `${(packed & 0x07) + 1} bit`,
+    color: (packed & 0x80) ? "Global color table" : "No global color table",
+    frames: countGifFrames(bytes)
+  };
+}
+
+function parseWebpInfo(bytes: Uint8Array): ImageInfo | null {
+  if (bytes.length < 16 || asciiAt(bytes, 0, 4) !== "RIFF" || asciiAt(bytes, 8, 4) !== "WEBP") {
+    return null;
+  }
+  const chunk = asciiAt(bytes, 12, 4);
+  if (chunk === "VP8X" && bytes.length >= 30) {
+    const flags = bytes[20];
+    return {
+      format: "WebP",
+      width: 1 + readUint24Le(bytes, 24),
+      height: 1 + readUint24Le(bytes, 27),
+      frames: (flags & 0x02) !== 0 ? countWebpAnimationFrames(bytes) : undefined,
+      color: (flags & 0x10) !== 0 ? "Alpha" : undefined
+    };
+  }
+  if (chunk === "VP8 " && bytes.length >= 30) {
+    const start = 20;
+    if (bytes[start + 3] === 0x9d && bytes[start + 4] === 0x01 && bytes[start + 5] === 0x2a) {
+      return {
+        format: "WebP",
+        width: readUint16Le(bytes, start + 6) & 0x3fff,
+        height: readUint16Le(bytes, start + 8) & 0x3fff
+      };
+    }
+  }
+  if (chunk === "VP8L" && bytes.length >= 25) {
+    const b0 = bytes[21];
+    const b1 = bytes[22];
+    const b2 = bytes[23];
+    const b3 = bytes[24];
+    return {
+      format: "WebP",
+      width: 1 + (((b1 & 0x3f) << 8) | b0),
+      height: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)),
+      color: "Lossless"
+    };
+  }
+  return { format: "WebP", note: `未知 ${chunk || "chunk"} 头` };
+}
+
+function parseAvifInfo(bytes: Uint8Array): ImageInfo | null {
+  const boxes = collectBmffBoxes(bytes, 0, bytes.length);
+  const ftyp = boxes.find((box) => box.type === "ftyp");
+  if (!ftyp) {
+    return null;
+  }
+  const majorBrand = asciiAt(bytes, ftyp.dataStart, 4);
+  const compatibleBrands = asciiAt(bytes, ftyp.dataStart + 8, Math.max(0, ftyp.dataEnd - ftyp.dataStart - 8));
+  if (!/\b(avif|avis|mif1|msf1|heic|heix|hevc|hevx)\b/.test(`${majorBrand} ${compatibleBrands}`)) {
+    return null;
+  }
+  const ispe = findBmffBox(bytes, boxes, "ispe");
+  return {
+    format: majorBrand === "avis" || compatibleBrands.includes("avis") ? "AVIF Sequence" : majorBrand.startsWith("hei") ? "HEIF" : "AVIF",
+    width: ispe && ispe.dataStart + 12 <= ispe.dataEnd ? readUint32Be(bytes, ispe.dataStart + 4) : undefined,
+    height: ispe && ispe.dataStart + 12 <= ispe.dataEnd ? readUint32Be(bytes, ispe.dataStart + 8) : undefined,
+    note: `brand ${majorBrand}${compatibleBrands.trim() ? ` · ${formatBmffBrands(compatibleBrands)}` : ""}`
+  };
+}
+
+type BmffBox = {
+  type: string;
+  start: number;
+  dataStart: number;
+  dataEnd: number;
+  end: number;
+};
+
+function collectBmffBoxes(bytes: Uint8Array, start: number, end: number): BmffBox[] {
+  const boxes: BmffBox[] = [];
+  let offset = start;
+  while (offset + 8 <= end && boxes.length < 512) {
+    let size = readUint32Be(bytes, offset);
+    const type = asciiAt(bytes, offset + 4, 4);
+    let headerSize = 8;
+    if (!/^[A-Za-z0-9 _-]{4}$/.test(type)) {
+      break;
+    }
+    if (size === 1 && offset + 16 <= end) {
+      const high = readUint32Be(bytes, offset + 8);
+      const low = readUint32Be(bytes, offset + 12);
+      size = high > 0 ? end - offset : low;
+      headerSize = 16;
+    } else if (size === 0) {
+      size = end - offset;
+    }
+    if (size < headerSize || offset + size > end) {
+      break;
+    }
+    boxes.push({
+      type,
+      start: offset,
+      dataStart: offset + headerSize,
+      dataEnd: offset + size,
+      end: offset + size
+    });
+    offset += size;
+  }
+  return boxes;
+}
+
+function findBmffBox(bytes: Uint8Array, boxes: BmffBox[], type: string): BmffBox | undefined {
+  for (const box of boxes) {
+    if (box.type === type) {
+      return box;
+    }
+    if (["meta", "iprp", "ipco", "moov", "trak", "mdia", "minf", "stbl"].includes(box.type)) {
+      const childStart = box.type === "meta" ? box.dataStart + 4 : box.dataStart;
+      const found = findBmffBox(bytes, collectBmffBoxes(bytes, childStart, box.dataEnd), type);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return undefined;
+}
+
+function formatBmffBrands(value: string): string {
+  const brands = value.match(/.{1,4}/g)?.map((brand) => brand.trim()).filter(Boolean) || [];
+  return brands.slice(0, 6).join(", ");
+}
+
+function parseBmpInfo(bytes: Uint8Array): ImageInfo | null {
+  if (bytes.length < 30 || asciiAt(bytes, 0, 2) !== "BM") {
+    return null;
+  }
+  const dibSize = readUint32Le(bytes, 14);
+  if (dibSize < 12) {
+    return { format: "BMP", note: "DIB header 太短" };
+  }
+  if (dibSize === 12 && bytes.length >= 26) {
+    return {
+      format: "BMP",
+      width: readUint16Le(bytes, 18),
+      height: readUint16Le(bytes, 20),
+      bitDepth: `${readUint16Le(bytes, 24)} bit`
+    };
+  }
+  return {
+    format: "BMP",
+    width: readInt32Le(bytes, 18),
+    height: Math.abs(readInt32Le(bytes, 22)),
+    bitDepth: `${readUint16Le(bytes, 28)} bit`
+  };
+}
+
+function parseIcoInfo(bytes: Uint8Array): ImageInfo | null {
+  if (bytes.length < 6 || readUint16Le(bytes, 0) !== 0 || ![1, 2].includes(readUint16Le(bytes, 2))) {
+    return null;
+  }
+  const count = readUint16Le(bytes, 4);
+  if (count < 1 || bytes.length < 6 + count * 16) {
+    return { format: "ICO/CUR", count };
+  }
+  const width = bytes[6] || 256;
+  const height = bytes[7] || 256;
+  return {
+    format: readUint16Le(bytes, 2) === 1 ? "ICO" : "CUR",
+    width,
+    height,
+    bitDepth: `${readUint16Le(bytes, 12)} bit`,
+    count
+  };
+}
+
+function parseSvgInfo(bytes: Uint8Array): ImageInfo | null {
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes.slice(0, Math.min(bytes.length, 8192)));
+  if (!/<svg[\s>]/i.test(text)) {
+    return null;
+  }
+  const tag = text.match(/<svg\b[^>]*>/i)?.[0] || "";
+  const width = numberAttribute(tag, "width");
+  const height = numberAttribute(tag, "height");
+  const viewBox = tag.match(/\bviewBox=["']([^"']+)["']/i)?.[1]?.trim();
+  const viewBoxParts = viewBox?.split(/[\s,]+/).map(Number).filter(Number.isFinite);
+  return {
+    format: "SVG",
+    width: width || (viewBoxParts?.length === 4 ? viewBoxParts[2] : undefined),
+    height: height || (viewBoxParts?.length === 4 ? viewBoxParts[3] : undefined),
+    note: viewBox ? `viewBox ${viewBox}` : undefined
+  };
+}
+
+function countPngChunks(bytes: Uint8Array, chunkType: string): number {
+  let offset = 8;
+  let count = 0;
+  while (offset + 12 <= bytes.length) {
+    const length = readUint32Be(bytes, offset);
+    const type = asciiAt(bytes, offset + 4, 4);
+    if (type === chunkType) {
+      count++;
+    }
+    offset += 12 + length;
+  }
+  return count;
+}
+
+function countGifFrames(bytes: Uint8Array): number {
+  let count = 0;
+  for (let index = 13; index < bytes.length; index++) {
+    if (bytes[index] === 0x2c) {
+      count++;
+    }
+  }
+  return count || 1;
+}
+
+function countWebpAnimationFrames(bytes: Uint8Array): number {
+  let count = 0;
+  for (let offset = 12; offset + 8 <= bytes.length; ) {
+    const type = asciiAt(bytes, offset, 4);
+    const size = readUint32Le(bytes, offset + 4);
+    if (type === "ANMF") {
+      count++;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  return count || 1;
+}
+
+function pngColorType(value: number): string {
+  const colors: Record<number, string> = {
+    0: "Grayscale",
+    2: "Truecolor",
+    3: "Indexed color",
+    4: "Grayscale + alpha",
+    6: "Truecolor + alpha"
+  };
+  return colors[value] || `Unknown (${value})`;
+}
+
+function numberAttribute(tag: string, name: string): number | undefined {
+  const value = tag.match(new RegExp(`\\b${name}=["']([0-9.]+)`, "i"))?.[1];
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function bytesMatch(bytes: Uint8Array, offset: number, expected: number[]): boolean {
+  return expected.every((byte, index) => bytes[offset + index] === byte);
+}
+
+function dataView(bytes: Uint8Array): DataView {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+}
+
+function asciiAt(bytes: Uint8Array, offset: number, length: number): string {
+  if (offset < 0 || offset + length > bytes.length) {
+    return "";
+  }
+  return new TextDecoder("ascii").decode(bytes.slice(offset, offset + length));
+}
+
+function readUint16Le(bytes: Uint8Array, offset: number): number {
+  return dataView(bytes).getUint16(offset, true);
+}
+
+function readUint24Le(bytes: Uint8Array, offset: number): number {
+  return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+}
+
+function readUint32Le(bytes: Uint8Array, offset: number): number {
+  return dataView(bytes).getUint32(offset, true);
+}
+
+function readUint32Be(bytes: Uint8Array, offset: number): number {
+  return dataView(bytes).getUint32(offset, false);
+}
+
+function readInt32Le(bytes: Uint8Array, offset: number): number {
+  return dataView(bytes).getInt32(offset, true);
 }
 
 function objectFit(fit: string): string {

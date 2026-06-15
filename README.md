@@ -3,7 +3,7 @@
 Open File Viewer 是一个面向现代 Web 产品的文件预览 SDK。它把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和代码文件放进同一个可控容器里，并同时支持原生 JavaScript、React 和 Vue。
 
 <p>
-  <a href="https://xushanpei.github.io/open-file-viewer/">官网</a>
+  <a href="https://open-file-viewer-workspace.void.app">官网</a>
   ·
   <a href="https://github.com/xushanpei/open-file-viewer">GitHub</a>
   ·
@@ -355,7 +355,7 @@ pnpm pack:check
 
 ## 链接
 
-- 官网：https://xushanpei.github.io/open-file-viewer/
+- 官网：https://open-file-viewer-workspace.void.app
 - GitHub：https://github.com/xushanpei/open-file-viewer
 - NPM Core：https://www.npmjs.com/package/@open-file-viewer/core
 - NPM React：https://www.npmjs.com/package/@open-file-viewer/react

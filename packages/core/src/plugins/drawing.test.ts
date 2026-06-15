@@ -28,6 +28,12 @@ describe("drawingPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-svg-stage")));
 
+    const summary = container.querySelector(".ofv-drawing-summary");
+    expect(summary?.textContent).toContain("对象3");
+    expect(summary?.textContent).toContain("rectangle 1");
+    expect(summary?.textContent).toContain("ellipse 1");
+    expect(summary?.textContent).toContain("文本1");
+    expect(summary?.textContent).toContain("范围10, 20, 130, 130");
     const svg = container.querySelector(".ofv-svg-stage");
     expect(svg?.querySelectorAll("rect")).toHaveLength(1);
     expect(svg?.querySelectorAll("ellipse")).toHaveLength(1);
@@ -334,6 +340,13 @@ describe("drawingPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-svg-stage")));
 
+    const summary = container.querySelector(".ofv-drawing-summary");
+    expect(summary?.textContent).toContain("对象4");
+    expect(summary?.textContent).toContain("rectangle 1");
+    expect(summary?.textContent).toContain("ellipse 1");
+    expect(summary?.textContent).toContain("rhombus 1");
+    expect(summary?.textContent).toContain("edge 1");
+    expect(summary?.textContent).toContain("文本3");
     const svg = container.querySelector(".ofv-svg-stage");
     expect(container.textContent).toContain("Draw.io 图形预览 1");
     expect(container.textContent).toContain("原始 XML 摘要");
@@ -447,6 +460,12 @@ describe("drawingPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-svg-stage")));
 
+    const summary = container.querySelector(".ofv-drawing-summary");
+    expect(summary?.textContent).toContain("对象3");
+    expect(summary?.textContent).toContain("geo 1");
+    expect(summary?.textContent).toContain("arrow 1");
+    expect(summary?.textContent).toContain("note 1");
+    expect(summary?.textContent).toContain("连线1");
     const svg = container.querySelector(".ofv-svg-stage");
     expect(container.textContent).toContain("tldraw 基础预览 3 shapes");
     expect(svg?.querySelectorAll("rect")).toHaveLength(2);

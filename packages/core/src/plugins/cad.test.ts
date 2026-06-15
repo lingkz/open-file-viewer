@@ -129,7 +129,9 @@ describe("cadPlugin", () => {
   it("renders DWG metadata and conversion guidance", async () => {
     const container = document.createElement("div");
     document.body.append(container);
-    const bytes = new Uint8Array([..."AC1027\0\0DWGDATA"].map((char) => char.charCodeAt(0)));
+    const bytes = new Uint8Array(
+      [..."AC1027\0\0DWGDATA\0LINE\0LAYER A-WALL\0BLOCK Door\0XREF site.dwg\0"].map((char) => char.charCodeAt(0))
+    );
 
     createViewer({
       container,
@@ -144,6 +146,13 @@ describe("cadPlugin", () => {
     expect(container.textContent).toContain("plan.dwg");
     expect(container.textContent).toContain("AC1027");
     expect(container.textContent).toContain("AutoCAD 2013");
+    expect(container.textContent).toContain("二进制结构探测");
+    expect(container.textContent).toContain("实体关键词LINE 1");
+    expect(container.textContent).toContain("图层线索1");
+    expect(container.textContent).toContain("块/引用线索1");
+    expect(container.textContent).toContain("外部引用1");
+    expect(container.textContent).toContain("LAYER A-WALL");
+    expect(container.textContent).toContain("XREF site.dwg");
     expect(container.textContent).toContain("ODA File Converter");
     expect(container.textContent).toContain("00000000");
     expect(container.textContent).toContain("AC1027");
@@ -188,21 +197,49 @@ describe("cadPlugin", () => {
     expect(container.textContent).toContain("50 4B 03 04");
   });
 
-  it("routes BIM and mechanical CAD files to a dedicated CAD guidance panel", async () => {
+  it("renders IFC BIM entity statistics and hierarchy summaries", async () => {
     const container = document.createElement("div");
     document.body.append(container);
 
     createViewer({
       container,
-      file: new Blob(["ISO-10303-21;"], { type: "application/x-step" }),
+      file: new Blob([sampleIfc()], { type: "application/x-step" }),
       fileName: "building.ifc",
+      plugins: [cadPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-cad-entities")));
+
+    expect(container.textContent).toContain("IFC BIM 结构预览");
+    expect(container.textContent).toContain("实体7");
+    expect(container.textContent).toContain("项目1");
+    expect(container.textContent).toContain("建筑1");
+    expect(container.textContent).toContain("楼层1");
+    expect(container.textContent).toContain("空间1");
+    expect(container.textContent).toContain("构件2");
+    expect(container.textContent).toContain("BIM 层级");
+    expect(container.textContent).toContain("Demo Project");
+    expect(container.textContent).toContain("Level 1");
+    expect(container.textContent).toContain("IFCWALL: 1");
+    expect(container.textContent).toContain("IFCDOOR: 1");
+    expect(container.querySelector(".ofv-svg-stage")).toBeNull();
+  });
+
+  it("routes unsupported mechanical CAD files to a dedicated CAD guidance panel", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob(["solid"], { type: "application/sldworks" }),
+      fileName: "part.sldprt",
       plugins: [cadPlugin()]
     });
 
     await waitFor(() => Boolean(container.querySelector(".ofv-cad")));
 
     expect(container.textContent).toContain("CAD 基础预览");
-    expect(container.textContent).toContain(".ifc");
+    expect(container.textContent).toContain(".sldprt");
     expect(container.textContent).toContain("已识别为图纸/工程格式");
   });
 });
@@ -328,6 +365,22 @@ function sampleIges(): string {
     "                                                                        S      1",
     "116,1.0,2.0,3.0;                                                        P      1",
     "110,0.0,0.0,0.0,10.0,0.0,0.0;                                           P      2"
+  ].join("\n");
+}
+
+function sampleIfc(): string {
+  return [
+    "ISO-10303-21;",
+    "DATA;",
+    "#1 = IFCPROJECT('0PROJECT',$,'Demo Project',$,$,$,$,$);",
+    "#2 = IFCSITE('0SITE',$,'Main Site',$,$,$,$,$,$,$,$,$,$,$);",
+    "#3 = IFCBUILDING('0BLDG',$,'HQ Building',$,$,$,$,$,$,$,$,$);",
+    "#4 = IFCBUILDINGSTOREY('0STOREY',$,'Level 1',$,$,$,$,$,$);",
+    "#5 = IFCSPACE('0SPACE',$,'Lobby',$,$,$,$,$,$,$);",
+    "#6 = IFCWALL('0WALL',$,'Lobby Wall',$,$,$,$,$);",
+    "#7 = IFCDOOR('0DOOR',$,'Entry Door',$,$,$,$,$);",
+    "ENDSEC;",
+    "END-ISO-10303-21;"
   ].join("\n");
 }
 

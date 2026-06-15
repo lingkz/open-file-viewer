@@ -66,8 +66,21 @@ describe("gisPlugin", () => {
       features: [
         {
           type: "Feature",
-          properties: { name: "Point" },
+          properties: { name: "Point", kind: "poi" },
           geometry: { type: "Point", coordinates: [120, 30] }
+        },
+        {
+          type: "Feature",
+          properties: { name: "Road" },
+          geometry: { type: "LineString", coordinates: [[120, 30], [121, 31]] }
+        },
+        {
+          type: "Feature",
+          properties: { area: "Block" },
+          geometry: {
+            type: "Polygon",
+            coordinates: [[[119, 29], [119, 30], [120, 30], [119, 29]]]
+          }
         }
       ]
     };
@@ -81,6 +94,12 @@ describe("gisPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-map-stage")));
 
+    expect(container.querySelector(".ofv-gis-summary")?.textContent).toContain("要素3");
+    expect(container.querySelector(".ofv-gis-summary")?.textContent).toContain("Point 1");
+    expect(container.querySelector(".ofv-gis-summary")?.textContent).toContain("LineString 1");
+    expect(container.querySelector(".ofv-gis-summary")?.textContent).toContain("属性字段3");
+    expect(container.querySelector(".ofv-gis-summary")?.textContent).toContain("name, kind, area");
+    expect(container.querySelector(".ofv-gis-summary")?.textContent).toContain("119, 29, 121, 31");
     expect(document.getElementById("ofv-leaflet-css")).not.toBeNull();
     expect(addTileLayer).toHaveBeenCalledTimes(1);
     expect(addGeoJsonLayer).toHaveBeenCalledTimes(1);

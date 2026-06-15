@@ -167,6 +167,87 @@ vi.mock("three/examples/jsm/loaders/GLTFLoader.js", () => ({
   }
 }));
 
+vi.mock("three/examples/jsm/loaders/FBXLoader.js", () => ({
+  FBXLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      const group = new THREE.Group();
+      group.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+      return group;
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/ColladaLoader.js", () => ({
+  ColladaLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      return { scene: new THREE.Group() };
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/OBJLoader.js", () => ({
+  OBJLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      return new THREE.Group();
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/STLLoader.js", () => ({
+  STLLoader: class {
+    async loadAsync() {
+      return { dispose: vi.fn() };
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/PLYLoader.js", () => ({
+  PLYLoader: class {
+    async loadAsync() {
+      return { dispose: vi.fn() };
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/3MFLoader.js", () => ({
+  ThreeMFLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      return new THREE.Group();
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/TDSLoader.js", () => ({
+  TDSLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      return new THREE.Group();
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/USDLoader.js", () => ({
+  USDLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      return new THREE.Group();
+    }
+  }
+}));
+
+vi.mock("three/examples/jsm/loaders/VRMLLoader.js", () => ({
+  VRMLLoader: class {
+    async loadAsync() {
+      const THREE = await import("three");
+      return new THREE.Group();
+    }
+  }
+}));
+
 describe("model3dPlugin", () => {
   afterEach(() => {
     document.body.replaceChildren();
@@ -181,7 +262,7 @@ describe("model3dPlugin", () => {
     shouldThrowGltf.value = false;
   });
 
-  it("renders an unsupported 3D placeholder with toolbar commands", async () => {
+  it("renders FBX with toolbar commands", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const objectUrl = "blob:ofv-model";
@@ -206,7 +287,7 @@ describe("model3dPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-model-stage")));
 
-    expect(container.querySelector(".ofv-model-message")?.textContent).toContain(".fbx");
+    expect(container.querySelector(".ofv-model-message")).toBeNull();
     expect(container.querySelector(".ofv-model-measure")?.textContent).toContain("模型测量");
     expect(container.querySelector(".ofv-model-measure")?.textContent).toContain("宽1");
     expect(container.querySelector(".ofv-model-measure")?.textContent).toContain("高1");
@@ -260,7 +341,7 @@ describe("model3dPlugin", () => {
     viewer.destroy();
   });
 
-  it("routes USD and VRML formats to the 3D placeholder renderer", async () => {
+  it("renders USD and VRML formats with dedicated loaders", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const objectUrl = "blob:ofv-usdz";
@@ -284,11 +365,40 @@ describe("model3dPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-model-stage")));
 
-    expect(container.querySelector(".ofv-model-message")?.textContent).toContain(".usdz");
+    expect(container.querySelector(".ofv-model-message")).toBeNull();
     expect(container.querySelector(".ofv-model-measure")?.textContent).toContain("模型测量");
 
     viewer.destroy();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl);
+  });
+
+  it("renders mesh-based and package 3D formats with dedicated loaders", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:ofv-ply"),
+      revokeObjectURL: vi.fn()
+    });
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn(() => 1)
+    );
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["ply"], { type: "application/ply" }),
+      fileName: "mesh.ply",
+      plugins: [model3dPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-model-stage")));
+
+    expect(container.querySelector(".ofv-model-message")).toBeNull();
+    expect(container.querySelector(".ofv-model-materials")?.textContent).toContain("网格1");
+
+    viewer.destroy();
   });
 
   it("falls back to a download panel when WebGL is unavailable", async () => {

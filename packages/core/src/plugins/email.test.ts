@@ -270,6 +270,55 @@ describe("emailPlugin", () => {
 
     viewer.destroy();
   });
+
+  it("renders MBOX mailbox summary while previewing the first message", async () => {
+    parseEmail.mockResolvedValueOnce({
+      from: { name: "Alice", address: "alice@example.com" },
+      to: [{ name: "Bob", address: "bob@example.com" }],
+      subject: "First",
+      date: "Mon, 15 Jun 2026 10:00:00 +0000",
+      text: "First body",
+      attachments: []
+    });
+    const mbox = [
+      "From alice@example.com Mon Jun 15 10:00:00 2026",
+      "Subject: First",
+      "From: Alice <alice@example.com>",
+      "Date: Mon, 15 Jun 2026 10:00:00 +0000",
+      "",
+      "First body",
+      "From carol@example.com Mon Jun 15 11:00:00 2026",
+      "Subject: Second",
+      "From: Carol <carol@example.com>",
+      "Date: Mon, 15 Jun 2026 11:00:00 +0000",
+      "",
+      "Second body"
+    ].join("\n");
+
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const viewer = createViewer({
+      container,
+      file: new Blob([mbox], { type: "application/mbox" }),
+      fileName: "archive.mbox",
+      plugins: [emailPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-email-mbox-table")));
+
+    expect(parseEmail).toHaveBeenCalledWith(expect.stringContaining("Subject: First"));
+    expect(parseEmail).toHaveBeenCalledWith(expect.not.stringContaining("Subject: Second"));
+    expect(container.textContent).toContain("MBOX 邮箱摘要");
+    expect(container.textContent).toContain("邮件数2");
+    expect(container.textContent).toContain("当前正文显示第一封邮件");
+    expect(container.textContent).toContain("First");
+    expect(container.textContent).toContain("Second");
+    expect(container.textContent).toContain("Carol <carol@example.com>");
+    expect(container.textContent).toContain("First body");
+
+    viewer.destroy();
+  });
 });
 
 async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> {

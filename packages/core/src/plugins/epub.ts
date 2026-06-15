@@ -6,6 +6,7 @@ import { createPanel, createSection, readArrayBuffer } from "./utils";
 const epubMimeTypes = new Set(["application/epub+zip", "application/x-epub+zip"]);
 
 type EpubManifestItem = {
+  id: string;
   href: string;
   mediaType: string;
   properties: string;
@@ -15,6 +16,25 @@ type EpubMetadata = {
   title: string;
   creator: string;
   language: string;
+  identifier: string;
+  publisher: string;
+  modified: string;
+};
+
+type EpubStructureSummary = {
+  manifestItems: number;
+  spineItems: number;
+  chapters: number;
+  images: number;
+  styles: number;
+  fonts: number;
+  audio: number;
+  video: number;
+  navItems: number;
+  tocItems: number;
+  coverItems: number;
+  otherItems: number;
+  missingSpineItems: number;
 };
 
 export function epubPlugin(): PreviewPlugin {
@@ -55,6 +75,7 @@ async function renderEpub(panel: HTMLElement, zip: JSZip): Promise<void> {
   const manifest = readManifest(opf);
   const spine = readSpine(opf, manifest);
   const metadata = readMetadata(opf);
+  const structure = summarizeEpubStructure(opf, manifest, spine);
   const assets = await readEpubAssets(zip, basePath, manifest);
 
   const summary = createSection("EPUB 图书信息");
@@ -63,7 +84,32 @@ async function renderEpub(panel: HTMLElement, zip: JSZip): Promise<void> {
   appendMeta(meta, "标题", metadata.title || "未命名 EPUB");
   appendMeta(meta, "作者", metadata.creator || "未知");
   appendMeta(meta, "语言", metadata.language || "未声明");
+  if (metadata.publisher) {
+    appendMeta(meta, "出版方", metadata.publisher);
+  }
+  if (metadata.identifier) {
+    appendMeta(meta, "标识", metadata.identifier);
+  }
+  if (metadata.modified) {
+    appendMeta(meta, "修改时间", metadata.modified);
+  }
   appendMeta(meta, "章节", spine.length || "未解析到阅读顺序");
+  appendMeta(meta, "Manifest", structure.manifestItems);
+  appendMeta(meta, "Spine", structure.spineItems);
+  appendMeta(meta, "导航", structure.navItems + structure.tocItems);
+  appendMeta(meta, "封面", structure.coverItems);
+  appendMeta(meta, "图片", structure.images);
+  appendMeta(meta, "样式", structure.styles);
+  appendMeta(meta, "字体", structure.fonts);
+  if (structure.audio || structure.video) {
+    appendMeta(meta, "音视频", `${structure.audio} / ${structure.video}`);
+  }
+  if (structure.otherItems) {
+    appendMeta(meta, "其他资源", structure.otherItems);
+  }
+  if (structure.missingSpineItems) {
+    appendMeta(meta, "缺失章节引用", structure.missingSpineItems);
+  }
   summary.append(meta);
   panel.append(summary);
 
@@ -127,6 +173,7 @@ function readManifest(opf: Document): Map<string, EpubManifestItem> {
       continue;
     }
     manifest.set(id, {
+      id,
       href,
       mediaType: getXmlAttribute(item, "media-type") || "",
       properties: getXmlAttribute(item, "properties") || ""
@@ -154,8 +201,56 @@ function readMetadata(opf: Document): EpubMetadata {
   return {
     title: textByLocalName(opf, "title"),
     creator: textByLocalName(opf, "creator"),
-    language: textByLocalName(opf, "language")
+    language: textByLocalName(opf, "language"),
+    identifier: textByLocalName(opf, "identifier"),
+    publisher: textByLocalName(opf, "publisher"),
+    modified: metaPropertyText(opf, "dcterms:modified")
   };
+}
+
+function summarizeEpubStructure(opf: Document, manifest: Map<string, EpubManifestItem>, spine: EpubManifestItem[]): EpubStructureSummary {
+  const items = Array.from(manifest.values());
+  const chapters = spine.length;
+  const images = items.filter((item) => item.mediaType.startsWith("image/")).length;
+  const styles = items.filter((item) => item.mediaType === "text/css").length;
+  const fonts = items.filter((item) => item.mediaType.startsWith("font/") || /font|opentype|truetype/i.test(item.mediaType)).length;
+  const audio = items.filter((item) => item.mediaType.startsWith("audio/")).length;
+  const video = items.filter((item) => item.mediaType.startsWith("video/")).length;
+  const navItems = items.filter((item) => propertyTokens(item.properties).has("nav")).length;
+  const tocItems = items.filter((item) => item.mediaType === "application/x-dtbncx+xml" || propertyTokens(item.properties).has("toc")).length;
+  const coverItems = items.filter((item) => item.id.toLowerCase().includes("cover") || propertyTokens(item.properties).has("cover-image")).length;
+  const otherItems = items.filter((item) => !isKnownEpubResource(item)).length;
+  return {
+    manifestItems: items.length,
+    spineItems: spine.length,
+    chapters,
+    images,
+    styles,
+    fonts,
+    audio,
+    video,
+    navItems,
+    tocItems,
+    coverItems,
+    otherItems,
+    missingSpineItems: Math.max(0, readSpineRefCount(opf) - spine.length)
+  };
+}
+
+function isKnownEpubResource(item: EpubManifestItem): boolean {
+  const properties = propertyTokens(item.properties);
+  return (
+    isChapterMediaType(item.mediaType) ||
+    item.mediaType.startsWith("image/") ||
+    item.mediaType === "text/css" ||
+    item.mediaType.startsWith("font/") ||
+    /font|opentype|truetype/i.test(item.mediaType) ||
+    item.mediaType.startsWith("audio/") ||
+    item.mediaType.startsWith("video/") ||
+    item.mediaType === "application/x-dtbncx+xml" ||
+    properties.has("nav") ||
+    properties.has("toc")
+  );
 }
 
 async function readEpubAssets(
@@ -244,6 +339,22 @@ function textByLocalName(doc: Document, localName: string): string {
       .find((element) => element.localName === localName)
       ?.textContent?.trim() || ""
   );
+}
+
+function metaPropertyText(doc: Document, property: string): string {
+  return (
+    Array.from(doc.getElementsByTagName("*"))
+      .find((element) => element.localName === "meta" && getXmlAttribute(element, "property") === property)
+      ?.textContent?.trim() || ""
+  );
+}
+
+function propertyTokens(value: string): Set<string> {
+  return new Set(value.split(/\s+/).map((item) => item.trim()).filter(Boolean));
+}
+
+function readSpineRefCount(opf: Document): number {
+  return Array.from(opf.getElementsByTagName("*")).filter((element) => element.localName === "itemref").length;
 }
 
 function getXmlAttribute(element: Element, localName: string): string | null {

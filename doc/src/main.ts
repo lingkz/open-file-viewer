@@ -41,6 +41,11 @@ interface DemoFile {
   file: File;
 }
 
+type ZipEntry = {
+  path: string;
+  content: string | Uint8Array;
+};
+
 interface ApiRow {
   name: string;
   type: string;
@@ -81,7 +86,7 @@ const translations: Record<Language, Record<string, string>> = {
     "integration.desc": "选择 Vanilla JS、React 或 Vue。底层插件一致，UI 可以先用默认组件，再逐步定制。",
     "playground.eyebrow": "Try it live",
     "playground.title": "Drop files and preview them instantly.",
-    "playground.desc": "本地文件只在浏览器内读取，不会上传。你也可以用内置示例体验 Markdown、JSON、SVG 和 DXF。",
+    "playground.desc": "本地文件只在浏览器内读取，不会上传。你也可以用内置示例体验 Markdown、JSON、Word、Excel、PowerPoint、SVG 和 DXF。",
     "playground.dropTitle": "Choose or drop files",
     "playground.dropDesc": "Multi-file preview queue supported",
     "playground.chooseFile": "选择文件",
@@ -136,7 +141,7 @@ const translations: Record<Language, Record<string, string>> = {
     "integration.desc": "Pick Vanilla JS, React or Vue. The plugin capability stays consistent, while the UI can start default and evolve later.",
     "playground.eyebrow": "Try it live",
     "playground.title": "Drop files and preview them instantly.",
-    "playground.desc": "Local files stay in your browser and are not uploaded. Built-in samples cover Markdown, JSON, SVG and DXF.",
+    "playground.desc": "Local files stay in your browser and are not uploaded. Built-in samples cover Markdown, JSON, Word, Excel, PowerPoint, SVG and DXF.",
     "playground.dropTitle": "Choose or drop files",
     "playground.dropDesc": "Multi-file preview queue supported",
     "playground.chooseFile": "Choose files",
@@ -177,7 +182,7 @@ const formats = [
   { title: "Text / Code", icon: "icon-code", level: { zh: "高亮与编辑器模式", en: "Highlight and editor mode" }, items: "txt md json jsonc json5 ipynb yaml toml ini proto hcl tex gv http js ts vue react css html py go rs rb swift kt" },
   { title: "Engineering", icon: "icon-cube", level: { zh: "工程资料与结构预览", en: "Engineering and structure" }, items: "dxf dwg step ifc gltf glb obj stl fbx dae 3mf usdz geojson kml kmz gpx shp drawio excalidraw" },
   { title: "Archive / Email", icon: "icon-archive", level: { zh: "目录、正文与附件", en: "Structure, body and attachments" }, items: "zip rar 7z tar gz tgz bz2 xz eml msg mbox" },
-  { title: "Assets / Data", icon: "icon-database", level: { zh: "识别与下载 fallback", en: "Recognition and fallback" }, items: "ttf otf woff woff2 psd ai eps sqlite wasm parquet avro webarchive" }
+  { title: "Assets / Data", icon: "icon-database", level: { zh: "结构解析与安全摘要", en: "Structure parsing and safe summaries" }, items: "ttf otf woff woff2 psd ai eps sqlite wasm parquet avro webarchive" }
 ];
 
 const frameworkCopy: Record<CodeTab, Record<Language, string>> = {
@@ -303,6 +308,18 @@ Archive,zip,Preview
       "formats.csv",
       { type: "text/csv" }
     )
+  },
+  {
+    label: { zh: "Word 文档 DOCX", en: "Word DOCX" },
+    file: createDocxSample()
+  },
+  {
+    label: { zh: "Excel 表格 XLSX", en: "Excel XLSX" },
+    file: createXlsxSample()
+  },
+  {
+    label: { zh: "PowerPoint 演示 PPTX", en: "PowerPoint PPTX" },
+    file: createPptxSample()
   },
   {
     label: { zh: "HTML 页面", en: "HTML Page" },
@@ -495,6 +512,370 @@ EOF`
     )
   }
 ];
+
+function createDocxSample(): File {
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+  const documentXml = `<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r><w:rPr><w:b/><w:sz w:val="36"/></w:rPr><w:t>Open File Viewer Office Preview Report</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:rPr><w:color w:val="64748B"/><w:sz w:val="22"/></w:rPr><w:t>Generated built-in DOCX sample for layout, wrapping, and table preview checks.</w:t></w:r>
+    </w:p>
+    <w:p><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>Executive summary</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Open File Viewer renders Office documents inside the same responsive preview shell used by images, PDFs, text, spreadsheets, and presentations. This document includes headings, paragraphs, long business copy, checklist rows, and a simple table so the playground feels closer to a real attachment.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Key checks: toolbar spacing, document width constraints, long-line wrapping, local scroll regions, and readable typography across desktop and mobile containers.</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Preview checklist</w:t></w:r></w:p>
+    <w:p><w:r><w:t>1. Confirm the page stays inside the viewer container without horizontal overflow.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>2. Confirm long product names and operational notes wrap cleanly on narrow screens.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>3. Confirm tables keep their content readable and do not push the whole application wider.</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr><w:tblW w:w="9000" w:type="dxa"/></w:tblPr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="2200" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Area</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="2200" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Status</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="4600" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Notes</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>Word preview</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Ready</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Paragraphs, headings, and table cells render as readable document content.</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>Responsive shell</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Verified</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>The sample includes longer copy to exercise wrapping and local scrolling behavior.</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>Fallback path</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Covered</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>If an Office renderer cannot preserve full layout, users still see structured document text.</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:rPr><w:b/><w:sz w:val="26"/></w:rPr><w:t>Implementation notes</w:t></w:r></w:p>
+    <w:p><w:r><w:t>The built-in sample is generated entirely in the browser. It does not upload files, and it keeps the demo self-contained for documentation, examples, and offline preview testing.</w:t></w:r></w:p>
+  </w:body>
+</w:document>`;
+  return createZipFile(
+    "sample-word.docx",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    [
+      { path: "[Content_Types].xml", content: contentTypes },
+      { path: "_rels/.rels", content: rels },
+      { path: "word/document.xml", content: documentXml }
+    ]
+  );
+}
+
+function createXlsxSample(): File {
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+  const rootRels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
+</Relationships>`;
+  const workbook = `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Overview" sheetId="1" r:id="rId1"/>
+    <sheet name="Quarterly Revenue" sheetId="2" r:id="rId2"/>
+    <sheet name="File QA Matrix" sheetId="3" r:id="rId3"/>
+  </sheets>
+</workbook>`;
+  const overviewSheet = `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="inlineStr"><is><t>Metric</t></is></c>
+      <c r="B1" t="inlineStr"><is><t>Value</t></is></c>
+      <c r="C1" t="inlineStr"><is><t>Owner</t></is></c>
+      <c r="D1" t="inlineStr"><is><t>Notes</t></is></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="inlineStr"><is><t>Supported demo formats</t></is></c>
+      <c r="B2"><v>11</v></c>
+      <c r="C2" t="inlineStr"><is><t>Documentation</t></is></c>
+      <c r="D2" t="inlineStr"><is><t>Markdown, JSON, CSV, DOCX, XLSX, PPTX, HTML, SVG, GeoJSON, Excalidraw, DXF</t></is></c>
+    </row>
+    <row r="3">
+      <c r="A3" t="inlineStr"><is><t>Office samples</t></is></c>
+      <c r="B3"><v>3</v></c>
+      <c r="C3" t="inlineStr"><is><t>Core preview</t></is></c>
+      <c r="D3" t="inlineStr"><is><t>Word, Excel, and PowerPoint samples are generated as real files in-browser.</t></is></c>
+    </row>
+    <row r="4">
+      <c r="A4" t="inlineStr"><is><t>Responsive checks</t></is></c>
+      <c r="B4"><v>8</v></c>
+      <c r="C4" t="inlineStr"><is><t>QA</t></is></c>
+      <c r="D4" t="inlineStr"><is><t>Toolbar wrapping, sheet tabs, long cells, slide bounds, and document width constraints.</t></is></c>
+    </row>
+    <row r="5">
+      <c r="A5" t="inlineStr"><is><t>Deployment target</t></is></c>
+      <c r="B5" t="inlineStr"><is><t>Void static SPA</t></is></c>
+      <c r="C5" t="inlineStr"><is><t>Website</t></is></c>
+      <c r="D5" t="inlineStr"><is><t>https://open-file-viewer-workspace.void.app</t></is></c>
+    </row>
+    <row r="6">
+      <c r="A6" t="inlineStr"><is><t>Total checks</t></is></c>
+      <c r="B6"><f>SUM(B2:B4)</f><v>22</v></c>
+      <c r="C6" t="inlineStr"><is><t>Formula</t></is></c>
+      <c r="D6" t="inlineStr"><is><t>This row exercises simple formula metadata in the workbook preview.</t></is></c>
+    </row>
+  </sheetData>
+</worksheet>`;
+  const revenueSheet = `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="inlineStr"><is><t>Quarter</t></is></c>
+      <c r="B1" t="inlineStr"><is><t>Product</t></is></c>
+      <c r="C1" t="inlineStr"><is><t>Region</t></is></c>
+      <c r="D1" t="inlineStr"><is><t>Files Previewed</t></is></c>
+      <c r="E1" t="inlineStr"><is><t>Success Rate</t></is></c>
+      <c r="F1" t="inlineStr"><is><t>Revenue</t></is></c>
+      <c r="G1" t="inlineStr"><is><t>Long Note</t></is></c>
+    </row>
+    <row r="2"><c r="A2" t="inlineStr"><is><t>Q1</t></is></c><c r="B2" t="inlineStr"><is><t>Document Workspace</t></is></c><c r="C2" t="inlineStr"><is><t>North America</t></is></c><c r="D2"><v>18240</v></c><c r="E2"><v>0.982</v></c><c r="F2"><v>128000</v></c><c r="G2" t="inlineStr"><is><t>Preview traffic grew after enabling Office attachments in the customer portal.</t></is></c></row>
+    <row r="3"><c r="A3" t="inlineStr"><is><t>Q1</t></is></c><c r="B3" t="inlineStr"><is><t>Operations Desk</t></is></c><c r="C3" t="inlineStr"><is><t>Europe</t></is></c><c r="D3"><v>14320</v></c><c r="E3"><v>0.971</v></c><c r="F3"><v>96000</v></c><c r="G3" t="inlineStr"><is><t>Spreadsheet tabs and wide tables should remain inside the local scroll area.</t></is></c></row>
+    <row r="4"><c r="A4" t="inlineStr"><is><t>Q2</t></is></c><c r="B4" t="inlineStr"><is><t>Partner Review</t></is></c><c r="C4" t="inlineStr"><is><t>Asia Pacific</t></is></c><c r="D4"><v>22105</v></c><c r="E4"><v>0.989</v></c><c r="F4"><v>174500</v></c><c r="G4" t="inlineStr"><is><t>PowerPoint sample is used by sales and enablement teams for demo decks.</t></is></c></row>
+    <row r="5"><c r="A5" t="inlineStr"><is><t>Q2</t></is></c><c r="B5" t="inlineStr"><is><t>Claims Archive</t></is></c><c r="C5" t="inlineStr"><is><t>Global</t></is></c><c r="D5"><v>19880</v></c><c r="E5"><v>0.964</v></c><c r="F5"><v>141250</v></c><c r="G5" t="inlineStr"><is><t>Long file names and metadata-heavy cells test ellipsis and wrapping behavior.</t></is></c></row>
+    <row r="6"><c r="A6" t="inlineStr"><is><t>Q3 Forecast</t></is></c><c r="B6" t="inlineStr"><is><t>Total</t></is></c><c r="C6" t="inlineStr"><is><t>All regions</t></is></c><c r="D6"><f>SUM(D2:D5)</f><v>74545</v></c><c r="E6"><v>0.9765</v></c><c r="F6"><f>SUM(F2:F5)</f><v>539750</v></c><c r="G6" t="inlineStr"><is><t>Formula cells are included so the preview can surface workbook metadata.</t></is></c></row>
+  </sheetData>
+</worksheet>`;
+  const qaSheet = `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="inlineStr"><is><t>File Type</t></is></c>
+      <c r="B1" t="inlineStr"><is><t>Scenario</t></is></c>
+      <c r="C1" t="inlineStr"><is><t>Expected Preview</t></is></c>
+      <c r="D1" t="inlineStr"><is><t>Status</t></is></c>
+      <c r="E1" t="inlineStr"><is><t>Viewport</t></is></c>
+      <c r="F1" t="inlineStr"><is><t>Owner</t></is></c>
+    </row>
+    <row r="2"><c r="A2" t="inlineStr"><is><t>DOCX</t></is></c><c r="B2" t="inlineStr"><is><t>Report with title, paragraphs, table, and checklist content</t></is></c><c r="C2" t="inlineStr"><is><t>Readable document page inside preview shell</t></is></c><c r="D2" t="inlineStr"><is><t>Pass</t></is></c><c r="E2" t="inlineStr"><is><t>Desktop and mobile</t></is></c><c r="F2" t="inlineStr"><is><t>Docs</t></is></c></row>
+    <row r="3"><c r="A3" t="inlineStr"><is><t>XLSX</t></is></c><c r="B3" t="inlineStr"><is><t>Multiple tabs, formulas, long cells, and wide columns</t></is></c><c r="C3" t="inlineStr"><is><t>Sheet tabs and table scroll independently</t></is></c><c r="D3" t="inlineStr"><is><t>Pass</t></is></c><c r="E3" t="inlineStr"><is><t>Narrow host</t></is></c><c r="F3" t="inlineStr"><is><t>Core</t></is></c></row>
+    <row r="4"><c r="A4" t="inlineStr"><is><t>PPTX</t></is></c><c r="B4" t="inlineStr"><is><t>Three slides with summary, workflow, and launch checklist text</t></is></c><c r="C4" t="inlineStr"><is><t>Slide canvas stays below toolbar without structure headers</t></is></c><c r="D4" t="inlineStr"><is><t>Pass</t></is></c><c r="E4" t="inlineStr"><is><t>Responsive viewer</t></is></c><c r="F4" t="inlineStr"><is><t>QA</t></is></c></row>
+    <row r="5"><c r="A5" t="inlineStr"><is><t>Images</t></is></c><c r="B5" t="inlineStr"><is><t>Zoom controls and metadata strip</t></is></c><c r="C5" t="inlineStr"><is><t>Image remains centered and constrained</t></is></c><c r="D5" t="inlineStr"><is><t>Pass</t></is></c><c r="E5" t="inlineStr"><is><t>Large files</t></is></c><c r="F5" t="inlineStr"><is><t>Media</t></is></c></row>
+    <row r="6"><c r="A6" t="inlineStr"><is><t>Fallback</t></is></c><c r="B6" t="inlineStr"><is><t>Unknown or partially supported formats</t></is></c><c r="C6" t="inlineStr"><is><t>Safe metadata summary with download action</t></is></c><c r="D6" t="inlineStr"><is><t>Pass</t></is></c><c r="E6" t="inlineStr"><is><t>Any container</t></is></c><c r="F6" t="inlineStr"><is><t>Platform</t></is></c></row>
+  </sheetData>
+</worksheet>`;
+  return createZipFile("sample-excel.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", [
+    { path: "[Content_Types].xml", content: contentTypes },
+    { path: "_rels/.rels", content: rootRels },
+    { path: "xl/_rels/workbook.xml.rels", content: workbookRels },
+    { path: "xl/workbook.xml", content: workbook },
+    { path: "xl/worksheets/sheet1.xml", content: overviewSheet },
+    { path: "xl/worksheets/sheet2.xml", content: revenueSheet },
+    { path: "xl/worksheets/sheet3.xml", content: qaSheet }
+  ]);
+}
+
+function createPptxSample(): File {
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+  <Override PartName="/ppt/slides/slide2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+  <Override PartName="/ppt/slides/slide3.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+</Types>`;
+  const rootRels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>`;
+  const presentationRels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide3.xml"/>
+</Relationships>`;
+  const presentation = `<?xml version="1.0" encoding="UTF-8"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:sldIdLst>
+    <p:sldId id="256" r:id="rId1"/>
+    <p:sldId id="257" r:id="rId2"/>
+    <p:sldId id="258" r:id="rId3"/>
+  </p:sldIdLst>
+</p:presentation>`;
+  const slide1 = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp><p:txBody><a:p><a:r><a:rPr sz="3600" b="1"/><a:t>Open File Viewer</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:rPr sz="2400"/><a:t>Office Preview Readiness Deck</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>Built-in PowerPoint sample for slide rendering, text wrapping, and responsive container checks.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>Includes three slides: overview, workflow, and launch checklist.</a:t></a:r></a:p></p:txBody></p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+  const slide2 = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp><p:txBody><a:p><a:r><a:rPr sz="3000" b="1"/><a:t>Preview workflow</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>1. User selects a local attachment or built-in sample from the playground.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>2. The viewer detects file type, picks the matching plugin, and mounts it inside the same shell.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>3. Toolbar actions, search, fullscreen, download, and responsive resize behavior remain consistent.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>4. Unsupported details fall back to safe structured summaries instead of breaking the page.</a:t></a:r></a:p></p:txBody></p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+  const slide3 = `<?xml version="1.0" encoding="UTF-8"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp><p:txBody><a:p><a:r><a:rPr sz="3000" b="1"/><a:t>Launch checklist</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>DOCX: headings, paragraphs, tables, and long copy stay readable.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>XLSX: multiple sheets, formulas, wide rows, and long cells stay inside local scroll regions.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>PPTX: slides render below the toolbar without exposing internal structure headers.</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:txBody><a:p><a:r><a:t>Result: the built-in sample menu now feels like a useful regression test, not a tiny placeholder.</a:t></a:r></a:p></p:txBody></p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+  return createZipFile(
+    "sample-powerpoint.pptx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    [
+      { path: "[Content_Types].xml", content: contentTypes },
+      { path: "_rels/.rels", content: rootRels },
+      { path: "ppt/_rels/presentation.xml.rels", content: presentationRels },
+      { path: "ppt/presentation.xml", content: presentation },
+      { path: "ppt/slides/slide1.xml", content: slide1 },
+      { path: "ppt/slides/slide2.xml", content: slide2 },
+      { path: "ppt/slides/slide3.xml", content: slide3 }
+    ]
+  );
+}
+
+function createZipFile(name: string, type: string, entries: ZipEntry[]): File {
+  const encoder = new TextEncoder();
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBytes = encoder.encode(entry.path);
+    const data = typeof entry.content === "string" ? encoder.encode(entry.content) : entry.content;
+    const crc = crc32(data);
+    const local = concatBytes(
+      uint32Le(0x04034b50),
+      uint16Le(20),
+      uint16Le(0),
+      uint16Le(0),
+      uint16Le(0),
+      uint16Le(0),
+      uint32Le(crc),
+      uint32Le(data.length),
+      uint32Le(data.length),
+      uint16Le(nameBytes.length),
+      uint16Le(0),
+      nameBytes,
+      data
+    );
+    const central = concatBytes(
+      uint32Le(0x02014b50),
+      uint16Le(20),
+      uint16Le(20),
+      uint16Le(0),
+      uint16Le(0),
+      uint16Le(0),
+      uint16Le(0),
+      uint32Le(crc),
+      uint32Le(data.length),
+      uint32Le(data.length),
+      uint16Le(nameBytes.length),
+      uint16Le(0),
+      uint16Le(0),
+      uint16Le(0),
+      uint16Le(0),
+      uint32Le(0),
+      uint32Le(offset),
+      nameBytes
+    );
+    localParts.push(local);
+    centralParts.push(central);
+    offset += local.length;
+  }
+
+  const centralDirectory = concatBytes(...centralParts);
+  const end = concatBytes(
+    uint32Le(0x06054b50),
+    uint16Le(0),
+    uint16Le(0),
+    uint16Le(entries.length),
+    uint16Le(entries.length),
+    uint32Le(centralDirectory.length),
+    uint32Le(offset),
+    uint16Le(0)
+  );
+  return new File([...localParts, centralDirectory, end].map(toArrayBuffer), name, { type });
+}
+
+function concatBytes(...chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function uint16Le(value: number): Uint8Array {
+  return Uint8Array.from([value & 0xff, (value >> 8) & 0xff]);
+}
+
+function uint32Le(value: number): Uint8Array {
+  return Uint8Array.from([value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff]);
+}
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
 
 const container = requiredElement<HTMLElement>("#viewer");
 const fileInput = requiredElement<HTMLInputElement>("#file");

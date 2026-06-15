@@ -5,7 +5,7 @@ import type { PreviewPlugin } from "../types";
 import { createPanel, createSection, readArrayBuffer, resolveFormat } from "./utils";
 
 const wordExtensions = new Set(["docx", "docm", "doc", "dotx", "dotm", "dot", "rtf", "odt", "fodt", "wps"]);
-const sheetExtensions = new Set(["xlsx", "xls", "xlsm", "xlsb", "xltx", "xltm", "csv", "tsv", "ods", "fods", "numbers", "et"]);
+const sheetExtensions = new Set(["xlsx", "xls", "xlsm", "xlsb", "xlt", "xltx", "xltm", "csv", "tsv", "ods", "fods", "numbers", "et"]);
 const presentationExtensions = new Set(["pptx", "pptm", "ppt", "pps", "ppsx", "ppsm", "potx", "potm", "odp", "fodp", "key", "dps"]);
 const packagedOfficeCandidates = new Set(["wps", "et", "dps", "numbers", "key"]);
 const SHEET_WINDOW_ROWS = 200;
@@ -92,6 +92,16 @@ type PresentationInsight = {
   animationCount: number;
   layouts: string[];
   slides: PresentationSlideInsight[];
+};
+
+type IWorkMetadata = {
+  title?: string;
+  author?: string;
+  company?: string;
+  subject?: string;
+  keywords?: string[];
+  created?: string;
+  modified?: string;
 };
 
 export function officePlugin(): PreviewPlugin {
@@ -300,6 +310,10 @@ async function renderSheet(
   try {
     workbook = xlsx.read(arrayBuffer, { type: "array" }) as WorkBook;
   } catch (error) {
+    if (isLegacyOfficeBinary(extension)) {
+      renderLegacyOfficeBinary(panel, extension, arrayBuffer, normalizeOfficeError(error));
+      return;
+    }
     renderSheetFallback(panel, extension, normalizeOfficeError(error));
     return;
   }
@@ -390,6 +404,7 @@ async function renderSheet(
       button.setAttribute("role", "tab");
       button.setAttribute("aria-selected", "false");
       button.textContent = sheetName;
+      button.title = sheetName;
       button.addEventListener("click", () => renderSheetByName(sheetName, index));
       buttons.set(sheetName, button);
       tabs.append(button);
@@ -510,6 +525,7 @@ function renderParsedSheets(panel: HTMLElement, sheets: ParsedSheet[], emptyMess
       button.setAttribute("role", "tab");
       button.setAttribute("aria-selected", "false");
       button.textContent = sheet.name;
+      button.title = sheet.name;
       button.addEventListener("click", () => renderSheetByIndex(sheet, index));
       buttons.set(sheet.name, button);
       tabs.append(button);
@@ -853,7 +869,11 @@ function createWorkbookSheetTable(
       const address = encodeCell({ r: rowIndex, c: columnIndex });
       const sourceCell = sheet[address];
       cell.dataset.cell = address;
-      cell.textContent = sourceCell ? formatCell(sourceCell) : "";
+      const text = sourceCell ? formatCell(sourceCell) : "";
+      cell.textContent = text;
+      if (text) {
+        cell.title = text;
+      }
       if (sourceCell?.f) {
         cell.classList.add("ofv-cell-formula");
         cell.title = `=${sourceCell.f}`;
@@ -881,6 +901,9 @@ function createParsedSheetTable(sheet: ParsedSheet, sheetIndex: number, viewport
       const address = encodeA1(rowIndex, columnIndex);
       cell.dataset.cell = address;
       cell.textContent = value;
+      if (value) {
+        cell.title = value;
+      }
       const formula = formulaMap.get(address);
       if (formula) {
         cell.classList.add("ofv-cell-formula");
@@ -1149,7 +1172,8 @@ async function renderPackagedOfficePreview(
       panel,
       extension,
       entries.map((entry) => entry.name),
-      "检测到 Apple iWork 包结构。Numbers/Keynote 的 IWA 数据需要专用解析器或服务端转换；当前先展示包内结构，便于确认文件内容。"
+      "检测到 Apple iWork 包结构。当前解析包内 plist 元数据并展示 IWA/资源结构；正文 IWA 数据可后续接入专用解析器增强。",
+      await extractIWorkMetadata(entries)
     );
     return true;
   }
@@ -1180,12 +1204,17 @@ function renderOfficePackageStructure(
   panel: HTMLElement,
   extension: string,
   entries: string[],
-  message: string
+  message: string,
+  metadata?: IWorkMetadata
 ): void {
   const section = createSection("Office 包结构预览");
   const note = document.createElement("p");
   note.className = "ofv-office-package-note";
   note.textContent = `.${extension} ${message}`;
+
+  if (metadata && Object.keys(metadata).length > 0) {
+    section.append(createIWorkMetadataSummary(metadata));
+  }
 
   const list = document.createElement("ul");
   list.className = "ofv-office-package-list";
@@ -1202,6 +1231,141 @@ function renderOfficePackageStructure(
 
   section.append(note, list);
   panel.append(section);
+}
+
+async function extractIWorkMetadata(entries: JSZip.JSZipObject[]): Promise<IWorkMetadata> {
+  const metadataEntries = entries.filter((entry) => /^metadata\/.*\.plist$/i.test(entry.name) || /properties\.plist$/i.test(entry.name));
+  const metadata: IWorkMetadata = {};
+  for (const entry of metadataEntries.slice(0, 6)) {
+    const text = await entry.async("text").catch(() => "");
+    if (!text || !/<plist[\s>]/i.test(text)) {
+      continue;
+    }
+    const plist = parsePlistDict(text);
+    mergeIWorkMetadata(metadata, plist);
+  }
+  return metadata;
+}
+
+function createIWorkMetadataSummary(metadata: IWorkMetadata): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = "ofv-iwork-meta";
+  const title = document.createElement("strong");
+  title.textContent = "iWork 元数据";
+  const grid = document.createElement("div");
+  grid.className = "ofv-iwork-meta-grid";
+  appendIWorkMeta(grid, "标题", metadata.title);
+  appendIWorkMeta(grid, "作者", metadata.author);
+  appendIWorkMeta(grid, "公司", metadata.company);
+  appendIWorkMeta(grid, "主题", metadata.subject);
+  appendIWorkMeta(grid, "关键词", metadata.keywords?.join(", "));
+  appendIWorkMeta(grid, "创建时间", metadata.created);
+  appendIWorkMeta(grid, "修改时间", metadata.modified);
+  wrapper.append(title, grid);
+  return wrapper;
+}
+
+function appendIWorkMeta(parent: HTMLElement, label: string, value?: string): void {
+  if (!value) {
+    return;
+  }
+  const row = document.createElement("div");
+  row.className = "ofv-meta-row";
+  const key = document.createElement("span");
+  key.textContent = label;
+  const content = document.createElement("strong");
+  content.textContent = value;
+  row.append(key, content);
+  parent.append(row);
+}
+
+function mergeIWorkMetadata(metadata: IWorkMetadata, plist: Record<string, unknown>): void {
+  metadata.title ||= plistText(plist, ["Title", "title", "DocumentTitle", "SFDocumentTitle", "kMDItemTitle"]);
+  metadata.author ||= plistText(plist, ["Author", "author", "Authors", "kMDItemAuthors", "creator"]);
+  metadata.company ||= plistText(plist, ["Company", "company", "Organization"]);
+  metadata.subject ||= plistText(plist, ["Subject", "subject", "Description", "comment"]);
+  metadata.created ||= plistText(plist, ["CreationDate", "created", "kMDItemFSCreationDate"]);
+  metadata.modified ||= plistText(plist, ["ModificationDate", "modified", "kMDItemFSContentChangeDate"]);
+  metadata.keywords ||= plistArray(plist, ["Keywords", "keywords", "kMDItemKeywords"]);
+}
+
+function parsePlistDict(xml: string): Record<string, unknown> {
+  if (typeof DOMParser === "undefined") {
+    return {};
+  }
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  if (doc.querySelector("parsererror")) {
+    return {};
+  }
+  const dict = Array.from(doc.documentElement.children).find((child) => child.tagName === "dict");
+  const value = dict ? parsePlistValue(dict) : undefined;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function parsePlistValue(element: Element): unknown {
+  switch (element.tagName) {
+    case "dict": {
+      const result: Record<string, unknown> = {};
+      const children = Array.from(element.children);
+      for (let index = 0; index < children.length; index++) {
+        const key = children[index];
+        if (key.tagName !== "key") {
+          continue;
+        }
+        const value = children[index + 1];
+        if (value) {
+          result[key.textContent || ""] = parsePlistValue(value);
+          index++;
+        }
+      }
+      return result;
+    }
+    case "array":
+      return Array.from(element.children).map(parsePlistValue);
+    case "true":
+      return true;
+    case "false":
+      return false;
+    case "integer":
+    case "real":
+      return Number(element.textContent || 0);
+    case "string":
+    case "date":
+    default:
+      return element.textContent?.trim() || "";
+  }
+}
+
+function plistText(plist: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = plist[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+    if (Array.isArray(value)) {
+      const text = value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).join(", ");
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return undefined;
+}
+
+function plistArray(plist: Record<string, unknown>, keys: string[]): string[] | undefined {
+  for (const key of keys) {
+    const value = plist[key];
+    if (Array.isArray(value)) {
+      const items = value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()));
+      if (items.length > 0) {
+        return items;
+      }
+    }
+    if (typeof value === "string" && value.trim()) {
+      return value.split(/[,;]/).map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return undefined;
 }
 
 function renderOpenDocumentPresentation(
@@ -1460,10 +1624,20 @@ function titleFromOdf(xml: string, fallback: string): string {
 }
 
 function isLegacyOfficeBinary(extension: string): boolean {
-  return extension === "doc" || extension === "dot" || extension === "ppt" || extension === "pps";
+  return ["doc", "dot", "xls", "xlt", "ppt", "pps"].includes(extension);
 }
 
-function renderLegacyOfficeBinary(panel: HTMLElement, extension: string, arrayBuffer: ArrayBuffer): void {
+function legacyOfficeFormatLabel(extension: string): string {
+  if (extension === "doc" || extension === "dot") {
+    return "Word Binary File Format";
+  }
+  if (extension === "xls" || extension === "xlt") {
+    return "Excel Binary File Format";
+  }
+  return "PowerPoint Binary File Format";
+}
+
+function renderLegacyOfficeBinary(panel: HTMLElement, extension: string, arrayBuffer: ArrayBuffer, parseError?: string): void {
   const fragments = extractLegacyOfficeText(arrayBuffer);
   panel.replaceChildren();
   const section = createSection("Office 二进制基础预览");
@@ -1479,9 +1653,12 @@ function renderLegacyOfficeBinary(panel: HTMLElement, extension: string, arrayBu
 
   const meta = document.createElement("dl");
   meta.className = "ofv-office-binary-meta";
-  appendOfficeBinaryMeta(meta, "格式类型", extension === "doc" || extension === "dot" ? "Word Binary File Format" : "PowerPoint Binary File Format");
+  appendOfficeBinaryMeta(meta, "格式类型", legacyOfficeFormatLabel(extension));
   appendOfficeBinaryMeta(meta, "文件结构", hasOleSignature(arrayBuffer) ? "检测到 OLE Compound File 签名" : "未检测到标准 OLE 签名，按原始二进制尝试提取");
   appendOfficeBinaryMeta(meta, "文本片段", `${fragments.length} 段`);
+  if (parseError) {
+    appendOfficeBinaryMeta(meta, "表格解析", `xlsx 读取失败，已切换二进制指纹：${parseError}`);
+  }
 
   section.append(format, meta);
 

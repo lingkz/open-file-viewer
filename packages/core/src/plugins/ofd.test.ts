@@ -41,6 +41,13 @@ describe("ofdPlugin", () => {
 
     await waitFor(() => container.textContent?.includes("发票标题") === true);
 
+    const summary = container.querySelector(".ofv-ofd-summary");
+    expect(summary?.textContent).toContain("文件2");
+    expect(summary?.textContent).toContain("XML1");
+    expect(summary?.textContent).toContain("页面1");
+    expect(summary?.textContent).toContain("文本2");
+    expect(summary?.textContent).toContain("文字长度10");
+    expect(summary?.textContent).toContain("页面尺寸210 x 297");
     expect(container.textContent).toContain("发票标题");
     expect(container.textContent).toContain("金额 100");
     expect(container.textContent).toContain("Content.xml");
@@ -94,6 +101,14 @@ describe("ofdPlugin", () => {
     await waitFor(() => Boolean(container.querySelector(".ofv-ofd-pages svg")));
 
     const svg = container.querySelector(".ofv-ofd-pages svg");
+    const summary = container.querySelector(".ofv-ofd-summary");
+    expect(summary?.textContent).toContain("页面1");
+    expect(summary?.textContent).toContain("文本1");
+    expect(summary?.textContent).toContain("路径1");
+    expect(summary?.textContent).toContain("线条1");
+    expect(summary?.textContent).toContain("图片对象1");
+    expect(summary?.textContent).toContain("图片资源1");
+    expect(summary?.textContent).toContain("页面尺寸120 x 160");
     expect(svg?.getAttribute("viewBox")).toBe("0 0 120 160");
     expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M 0 0 L 60 0 L 60 30 L 0 30 Z");
     expect(svg?.querySelector("path")?.getAttribute("transform")).toBe("translate(10 10)");

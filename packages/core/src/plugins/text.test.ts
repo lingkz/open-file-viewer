@@ -128,6 +128,71 @@ describe("textPlugin", () => {
     expect(container.querySelector(".ofv-code-title")?.textContent).toContain("javascript");
   });
 
+  it("renders JSON structure summaries", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob([JSON.stringify({ name: "Open File Viewer", plugins: ["pdf", "text"], enabled: true }, null, 2)], {
+        type: "application/json"
+      }),
+      fileName: "config.json",
+      plugins: [textPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-text-structure")));
+
+    expect(container.textContent).toContain("结构Object");
+    expect(container.textContent).toContain("键3");
+    expect(container.textContent).toContain("name, plugins, enabled");
+  });
+
+  it("renders notebook cell summaries", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob([
+        JSON.stringify({
+          cells: [
+            { cell_type: "markdown", source: ["# Title"] },
+            { cell_type: "code", source: ["print('hi')"] },
+            { cell_type: "code", source: ["1 + 1"] }
+          ],
+          metadata: { kernelspec: { display_name: "Python 3" } }
+        })
+      ], { type: "application/x-ipynb+json" }),
+      fileName: "analysis.ipynb",
+      plugins: [textPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-text-structure")));
+
+    expect(container.textContent).toContain("Notebook3 cells");
+    expect(container.textContent).toContain("markdown 1, code 2");
+    expect(container.textContent).toContain("KernelPython 3");
+  });
+
+  it("renders NDJSON record summaries", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob(['{"id":1}\n{"id":2}\n[3]\nnot json'], { type: "application/x-ndjson" }),
+      fileName: "events.ndjson",
+      plugins: [textPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-text-structure")));
+
+    expect(container.textContent).toContain("NDJSON4 lines");
+    expect(container.textContent).toContain("可解析3");
+    expect(container.textContent).toContain("object 2, array 1");
+  });
+
   it.each([
     { type: "text/xml", text: "<root><item>XML</item></root>", language: "markup" },
     { type: "application/x-yaml", text: "name: Open File Viewer", language: "yaml" }

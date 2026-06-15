@@ -20,6 +20,36 @@ import { textPlugin } from "./text";
 import { videoPlugin } from "./video";
 import { xpsPlugin } from "./xps";
 
+const renderDocxAsync = vi.hoisted(() =>
+  vi.fn(async (_data: unknown, bodyContainer: HTMLElement) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "ofv-docx-wrapper";
+    const page = document.createElement("section");
+    page.className = "ofv-docx";
+    page.textContent = "DOCX smoke paragraph with an extremely-long-token-that-must-not-widen-the-preview-host";
+    wrapper.append(page);
+    bodyContainer.append(wrapper);
+  })
+);
+const openPptx = vi.hoisted(() =>
+  vi.fn(async (_data: unknown, container: HTMLElement) => {
+    const slide = document.createElement("div");
+    slide.dataset.slideIndex = "0";
+    slide.textContent = "PPTX smoke slide with a very-long-title-that-must-wrap-inside-the-preview";
+    container.append(slide);
+  })
+);
+
+vi.mock("docx-preview", () => ({
+  renderAsync: renderDocxAsync
+}));
+
+vi.mock("@aiden0z/pptx-renderer", () => ({
+  PptxViewer: {
+    open: openPptx
+  }
+}));
+
 type SmokeCase = {
   name: string;
   file: PreviewSource | (() => Promise<PreviewSource> | PreviewSource);
@@ -110,6 +140,41 @@ describe("default plugin render smoke", () => {
 
     viewer.destroy();
   });
+
+  it.each(frequentPreviewCases())("renders $name with the shared toolbar inside a narrow host", async (testCase) => {
+    const container = document.createElement("div");
+    container.style.width = "240px";
+    container.style.height = "300px";
+    document.body.append(container);
+
+    const onError = vi.fn();
+    const viewer = createViewer({
+      container,
+      file: await resolveSource(testCase.file),
+      fileName: testCase.fileName,
+      mimeType: testCase.mimeType,
+      width: "240px",
+      height: "300px",
+      toolbar: true,
+      plugins: testCase.plugins,
+      onError
+    });
+
+    await waitFor(
+      () =>
+        Boolean(container.querySelector(".ofv-toolbar")) &&
+        Boolean(container.querySelector(testCase.selector)) &&
+        (!testCase.text || container.textContent?.includes(testCase.text) === true)
+    );
+
+    expect(container.classList.contains("ofv-root")).toBe(true);
+    expect(container.querySelector(".ofv-toolbar")).not.toBeNull();
+    expect(container.getBoundingClientRect().width).toBeLessThanOrEqual(240);
+    expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth + 1);
+    expect(onError).not.toHaveBeenCalled();
+
+    viewer.destroy();
+  });
 });
 
 function smokeCases(): SmokeCase[] {
@@ -164,6 +229,14 @@ function smokeCases(): SmokeCase[] {
       fileName: "broken.png",
       plugins: [imagePlugin()],
       selector: ".ofv-image-content"
+    },
+    {
+      name: "image metadata",
+      file: minimalPng(),
+      fileName: "poster-with-long-file-name-that-should-not-overflow.png",
+      plugins: [imagePlugin()],
+      selector: ".ofv-image-info",
+      text: "320 x 180px"
     },
     {
       name: "audio",
@@ -222,6 +295,30 @@ function smokeCases(): SmokeCase[] {
       text: "Alice"
     },
     {
+      name: "word docx",
+      file: minimalDocx,
+      fileName: "contract-with-long-file-name-that-should-not-overflow.docx",
+      plugins: [officePlugin()],
+      selector: ".ofv-docx-document",
+      text: "DOCX smoke paragraph"
+    },
+    {
+      name: "excel xlsx",
+      file: minimalXlsx,
+      fileName: "financial-model-with-long-name-that-should-not-overflow.xlsx",
+      plugins: [officePlugin()],
+      selector: ".ofv-table-scroll",
+      text: "AliceWithVeryLongUnbrokenNameThatShouldStayInsideTheTableScrollRegion"
+    },
+    {
+      name: "powerpoint pptx",
+      file: minimalPptx,
+      fileName: "roadmap-with-long-file-name-that-should-not-overflow.pptx",
+      plugins: [officePlugin()],
+      selector: ".ofv-pptx-viewer",
+      text: "PPTX smoke slide"
+    },
+    {
       name: "archive",
       file: minimalZip,
       fileName: "bundle.zip",
@@ -246,12 +343,12 @@ function smokeCases(): SmokeCase[] {
       selector: ".ofv-svg-stage"
     },
     {
-      name: "CAD guidance",
-      file: new Blob(["ISO-10303-21;"], { type: "application/x-step" }),
+      name: "IFC BIM",
+      file: minimalIfc(),
       fileName: "building.ifc",
       plugins: [cadPlugin()],
       selector: ".ofv-cad",
-      text: "CAD 基础预览"
+      text: "IFC BIM 结构预览"
     },
     {
       name: "GIS",
@@ -289,12 +386,112 @@ function smokeCases(): SmokeCase[] {
   ];
 }
 
+function frequentPreviewCases(): SmokeCase[] {
+  return [
+    {
+      name: "image",
+      file: minimalPng(),
+      fileName: "toolbar-poster-with-long-file-name-that-should-not-overflow.png",
+      plugins: [imagePlugin()],
+      selector: ".ofv-image-info",
+      text: "320 x 180px"
+    },
+    {
+      name: "word docx",
+      file: minimalDocx,
+      fileName: "toolbar-contract-with-long-file-name-that-should-not-overflow.docx",
+      plugins: [officePlugin()],
+      selector: ".ofv-docx-document",
+      text: "DOCX smoke paragraph"
+    },
+    {
+      name: "excel xlsx",
+      file: minimalXlsx,
+      fileName: "toolbar-financial-model-with-long-name-that-should-not-overflow.xlsx",
+      plugins: [officePlugin()],
+      selector: ".ofv-table-scroll",
+      text: "AliceWithVeryLongUnbrokenNameThatShouldStayInsideTheTableScrollRegion"
+    },
+    {
+      name: "powerpoint pptx",
+      file: minimalPptx,
+      fileName: "toolbar-roadmap-with-long-file-name-that-should-not-overflow.pptx",
+      plugins: [officePlugin()],
+      selector: ".ofv-pptx-viewer",
+      text: "PPTX smoke slide"
+    }
+  ];
+}
+
 async function resolveSource(source: SmokeCase["file"]): Promise<PreviewSource> {
   return typeof source === "function" ? source() : source;
 }
 
 function workbookCsv(): Blob {
   return new Blob(["name,score\nAlice,100"], { type: "text/csv" });
+}
+
+function minimalPng(): Blob {
+  const ihdr = [
+    ...uint32Be(13),
+    ...ascii("IHDR"),
+    ...uint32Be(320),
+    ...uint32Be(180),
+    8,
+    6,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ];
+  return new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...ihdr])], { type: "image/png" });
+}
+
+async function minimalDocx(): Promise<Blob> {
+  const zip = new JSZip();
+  zip.file(
+    "word/document.xml",
+    `<?xml version="1.0" encoding="UTF-8"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body><w:p><w:r><w:t>DOCX smoke paragraph</w:t></w:r></w:p></w:body>
+    </w:document>`
+  );
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  });
+}
+
+async function minimalXlsx(): Promise<ArrayBuffer> {
+  const xlsx = await import("xlsx");
+  const workbook = xlsx.utils.book_new();
+  const sheet = xlsx.utils.aoa_to_sheet([
+    ["Name", "Score", "Notes"],
+    ["AliceWithVeryLongUnbrokenNameThatShouldStayInsideTheTableScrollRegion", 100, "ok"]
+  ]);
+  xlsx.utils.book_append_sheet(workbook, sheet, "VeryLongSheetNameForNarrowUI");
+  return xlsx.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+}
+
+async function minimalPptx(): Promise<Blob> {
+  const zip = new JSZip();
+  zip.file(
+    "ppt/slides/slide1.xml",
+    `<?xml version="1.0" encoding="UTF-8"?>
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree>
+          <p:sp><p:txBody><a:p><a:r><a:t>PPTX smoke slide</a:t></a:r></a:p></p:txBody></p:sp>
+        </p:spTree></p:cSld>
+      </p:sld>`
+  );
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  });
 }
 
 async function minimalZip(): Promise<ArrayBuffer> {
@@ -378,6 +575,32 @@ function minimalEmail(): Blob {
     ],
     { type: "message/rfc822" }
   );
+}
+
+function minimalIfc(): Blob {
+  return new Blob(
+    [
+      [
+        "ISO-10303-21;",
+        "DATA;",
+        "#1 = IFCPROJECT('0PROJECT',$,'Smoke Project',$,$,$,$,$);",
+        "#2 = IFCBUILDING('0BLDG',$,'Smoke Building',$,$,$,$,$,$,$,$,$);",
+        "#3 = IFCBUILDINGSTOREY('0STOREY',$,'Ground Floor',$,$,$,$,$,$);",
+        "#4 = IFCWALL('0WALL',$,'Smoke Wall',$,$,$,$,$);",
+        "ENDSEC;",
+        "END-ISO-10303-21;"
+      ].join("\n")
+    ],
+    { type: "application/x-step" }
+  );
+}
+
+function ascii(value: string): number[] {
+  return [...new TextEncoder().encode(value)];
+}
+
+function uint32Be(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
 }
 
 function failingPdfJs() {

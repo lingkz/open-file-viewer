@@ -235,11 +235,45 @@ async function loadModel(
     const { OBJLoader } = await import("three/examples/jsm/loaders/OBJLoader.js");
     return { object: await new OBJLoader().loadAsync(url) };
   }
+  if (extension === "fbx") {
+    const { FBXLoader } = await import("three/examples/jsm/loaders/FBXLoader.js");
+    return { object: await new FBXLoader().loadAsync(url) };
+  }
+  if (extension === "dae") {
+    const { ColladaLoader } = await import("three/examples/jsm/loaders/ColladaLoader.js");
+    const collada = await new ColladaLoader().loadAsync(url);
+    if (!collada) {
+      throw new Error("Collada loader returned no scene.");
+    }
+    return { object: collada.scene };
+  }
   if (extension === "stl") {
     const { STLLoader } = await import("three/examples/jsm/loaders/STLLoader.js");
     const geometry = await new STLLoader().loadAsync(url);
     const material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.55 });
     return { object: new THREE.Mesh(geometry, material) };
+  }
+  if (extension === "ply") {
+    const { PLYLoader } = await import("three/examples/jsm/loaders/PLYLoader.js");
+    const geometry = await new PLYLoader().loadAsync(url);
+    const material = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.55 });
+    return { object: new THREE.Mesh(geometry, material) };
+  }
+  if (extension === "3mf") {
+    const { ThreeMFLoader } = await import("three/examples/jsm/loaders/3MFLoader.js");
+    return { object: await new ThreeMFLoader().loadAsync(url) };
+  }
+  if (extension === "3ds") {
+    const { TDSLoader } = await import("three/examples/jsm/loaders/TDSLoader.js");
+    return { object: await new TDSLoader().loadAsync(url) };
+  }
+  if (extension === "usd" || extension === "usda" || extension === "usdc" || extension === "usdz") {
+    const { USDLoader } = await import("three/examples/jsm/loaders/USDLoader.js");
+    return { object: await new USDLoader().loadAsync(url) };
+  }
+  if (extension === "wrl" || extension === "vrml") {
+    const { VRMLLoader } = await import("three/examples/jsm/loaders/VRMLLoader.js");
+    return { object: await new VRMLLoader().loadAsync(url) };
   }
   const group = new THREE.Group();
   const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -248,7 +282,7 @@ async function loadModel(
   group.add(mesh);
   return {
     object: group,
-    message: `.${extension} 已识别为 3D 格式，当前内置渲染优先支持 gltf/glb/obj/stl。`
+    message: `.${extension} 已识别为 3D 格式，当前内置渲染优先支持 gltf/glb/obj/stl/fbx/dae/ply/3mf/3ds/usd/usdz/vrml。`
   };
 }
 

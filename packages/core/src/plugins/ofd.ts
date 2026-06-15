@@ -56,6 +56,7 @@ export function ofdPlugin(): PreviewPlugin {
         ? "当前版本提取 OFD 页面文本、路径、直线和图片对象，并按 Boundary 坐标生成轻量 SVG 版式预览。复杂字体、签章和颜色空间可后续接入专用 OFD 渲染器。"
         : "当前版本提取 OFD 包内 XML 文本和文件结构。版式级渲染可在后续接入专用 OFD 渲染器。";
       section.append(note);
+      section.append(createOfdSummary(entries, pages, images));
 
       if (pages.length > 0) {
         const pagesWrap = document.createElement("div");
@@ -141,6 +142,60 @@ type OfdPagePreview = {
   lines: OfdLineObject[];
   images: OfdImageObject[];
 };
+
+function createOfdSummary(entries: JSZip.JSZipObject[], pages: OfdPagePreview[], images: Map<string, string>): HTMLElement {
+  const summary = document.createElement("div");
+  summary.className = "ofv-ofd-summary";
+  const xmlEntries = entries.filter((entry) => entry.name.endsWith(".xml")).length;
+  const textCount = pages.reduce((count, page) => count + page.texts.length, 0);
+  const pathCount = pages.reduce((count, page) => count + page.paths.length, 0);
+  const lineCount = pages.reduce((count, page) => count + page.lines.length, 0);
+  const imageCount = pages.reduce((count, page) => count + page.images.length, 0);
+  const textLength = pages.reduce((count, page) => count + page.texts.reduce((inner, item) => inner + item.text.length, 0), 0);
+  appendOfdSummary(summary, "文件", String(entries.length));
+  appendOfdSummary(summary, "XML", String(xmlEntries));
+  appendOfdSummary(summary, "页面", String(pages.length));
+  appendOfdSummary(summary, "文本", String(textCount));
+  appendOfdSummary(summary, "路径", String(pathCount));
+  appendOfdSummary(summary, "线条", String(lineCount));
+  appendOfdSummary(summary, "图片对象", String(imageCount));
+  appendOfdSummary(summary, "图片资源", String(uniqueOfdImageResources(images)));
+  if (textLength > 0) {
+    appendOfdSummary(summary, "文字长度", String(textLength));
+  }
+  const sizes = formatOfdPageSizes(pages);
+  if (sizes) {
+    appendOfdSummary(summary, "页面尺寸", sizes);
+  }
+  return summary;
+}
+
+function appendOfdSummary(parent: HTMLElement, label: string, value: string): void {
+  const item = document.createElement("span");
+  const key = document.createElement("span");
+  key.textContent = label;
+  const content = document.createElement("strong");
+  content.textContent = value;
+  item.append(key, content);
+  parent.append(item);
+}
+
+function uniqueOfdImageResources(images: Map<string, string>): number {
+  return new Set(images.values()).size;
+}
+
+function formatOfdPageSizes(pages: OfdPagePreview[]): string {
+  const counts = new Map<string, number>();
+  for (const page of pages) {
+    const key = `${Math.round(page.width)} x ${Math.round(page.height)}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([size, count]) => (count > 1 ? `${size} (${count})` : size))
+    .join(", ");
+}
 
 async function readOfdPages(
   entries: JSZip.JSZipObject[],

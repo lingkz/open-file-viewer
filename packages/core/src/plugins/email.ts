@@ -29,6 +29,12 @@ interface EmailData {
   attachments: EmailAttachment[];
 }
 
+interface MboxMessageSummary {
+  from: string;
+  subject: string;
+  date: string;
+}
+
 export function emailPlugin(): PreviewPlugin {
   return {
     name: "email",
@@ -46,6 +52,7 @@ export function emailPlugin(): PreviewPlugin {
       const objectUrlsToRevoke: string[] = [];
       const attachmentObjectUrls = new Map<EmailAttachment, string>();
       const timersToClear: number[] = [];
+      let mboxSummary: MboxMessageSummary[] = [];
 
       try {
         if (ext === "msg") {
@@ -112,7 +119,9 @@ export function emailPlugin(): PreviewPlugin {
           
           let rawText = await readTextFile(ctx.file);
           if (ext === "mbox") {
-            rawText = getEmlFromMbox(rawText);
+            const messages = splitMboxMessages(rawText);
+            mboxSummary = messages.map(summarizeMboxMessage);
+            rawText = messages[0] || rawText;
           }
 
           const parsed = await parser.parse(rawText);
@@ -140,6 +149,10 @@ export function emailPlugin(): PreviewPlugin {
               contentId: att.contentId
             }))
           };
+        }
+
+        if (mboxSummary.length > 0) {
+          panel.append(createMboxSummarySection(mboxSummary));
         }
 
         // 1. Render Header information section
@@ -358,26 +371,82 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Helper to convert MBOX format to first EML message text
-function getEmlFromMbox(mboxText: string): string {
+function createMboxSummarySection(messages: MboxMessageSummary[]): HTMLElement {
+  const section = createSection("MBOX 邮箱摘要");
+  const meta = document.createElement("div");
+  meta.className = "ofv-email-mbox-meta";
+  appendMeta(meta, "邮件数", String(messages.length));
+  appendMeta(meta, "预览", "当前正文显示第一封邮件");
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "ofv-table-scroll ofv-email-mbox-table";
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const header = document.createElement("tr");
+  for (const label of ["#", "Subject", "From", "Date"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    header.append(th);
+  }
+  thead.append(header);
+  const tbody = document.createElement("tbody");
+  messages.slice(0, 100).forEach((message, index) => {
+    const row = document.createElement("tr");
+    for (const value of [String(index + 1), message.subject || "(无主题)", message.from || "-", message.date || "-"]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    }
+    tbody.append(row);
+  });
+  table.append(thead, tbody);
+  tableWrap.append(table);
+  section.append(meta, tableWrap);
+  return section;
+}
+
+function splitMboxMessages(mboxText: string): string[] {
   const lines = mboxText.replace(/\r\n/g, "\n").split("\n");
-  const emlLines: string[] = [];
+  const messages: string[][] = [];
+  let current: string[] | null = null;
   let foundFirstFrom = false;
 
   for (const line of lines) {
     if (line.startsWith("From ")) {
-      if (foundFirstFrom) {
-        break; // Stop at the start of second email
+      if (current && current.length > 0) {
+        messages.push(current);
       }
+      current = [];
       foundFirstFrom = true;
-      continue; // Skip the mbox From marker line
+      continue;
     }
-    if (foundFirstFrom) {
-      emlLines.push(line);
+    if (foundFirstFrom && current) {
+      current.push(line.startsWith(">From ") ? line.slice(1) : line);
     }
   }
+  if (current && current.length > 0) {
+    messages.push(current);
+  }
+  return messages.length > 0 ? messages.map((message) => message.join("\n")) : [mboxText];
+}
 
-  return foundFirstFrom ? emlLines.join("\n") : mboxText;
+function summarizeMboxMessage(message: string): MboxMessageSummary {
+  return {
+    from: unfoldHeader(readHeaderValue(message, "From")),
+    subject: unfoldHeader(readHeaderValue(message, "Subject")),
+    date: unfoldHeader(readHeaderValue(message, "Date"))
+  };
+}
+
+function readHeaderValue(message: string, name: string): string {
+  const headers = message.split(/\n\s*\n/, 1)[0] || "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = headers.match(new RegExp(`^${escaped}:\\s*([\\s\\S]*?)(?=\\n[^\\s:]+:|\\n\\s*\\n|$)`, "im"));
+  return match?.[1]?.trim() || "";
+}
+
+function unfoldHeader(value: string): string {
+  return value.replace(/\n[ \t]+/g, " ").trim();
 }
 
 // File extension to MIME type helper for attachment previews

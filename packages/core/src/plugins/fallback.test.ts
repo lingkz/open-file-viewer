@@ -30,12 +30,35 @@ describe("fallbackPlugin", () => {
     await waitFor(() => Boolean(container.querySelector(".ofv-fallback")));
 
     expect(container.querySelector(".ofv-viewport")?.classList.contains("ofv-center")).toBe(true);
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("文件unknown.bin");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("格式.bin");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("MIME未声明");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("大小4 B");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("来源本地/内存文件");
     expect(container.querySelector("a")?.getAttribute("href")).toBe(objectUrl);
     expect(unsupported).toHaveBeenCalledTimes(1);
 
     viewer.destroy();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl);
     expect(container.childElementCount).toBe(0);
+  });
+
+  it("shows remote source details in fallback metadata", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: "https://example.com/downloads/archive.weird",
+      plugins: [fallbackPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-fallback-meta")));
+
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("archive.weird");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("格式.weird");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("大小未知");
+    expect(container.querySelector(".ofv-fallback-meta")?.textContent).toContain("来源远程 URL");
   });
 });
 

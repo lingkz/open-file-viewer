@@ -145,6 +145,43 @@ describe("officePlugin", () => {
     expect(container.querySelector(".ofv-table-scroll table")?.id).toBe("ofv-sheet-1");
   });
 
+  it("keeps long workbook labels and cells inside a narrow host", async () => {
+    const xlsx = await import("xlsx");
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(
+      workbook,
+      xlsx.utils.aoa_to_sheet([
+        ["ExtremelyLongHeaderThatShouldRemainInsideTheScrollableTable"],
+        ["ExtremelyLongCellValueThatShouldNotExpandTheOuterViewerContainer"]
+      ]),
+      "VeryLongSheetNameForNarrowUI"
+    );
+    const buffer = xlsx.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const container = document.createElement("div");
+    container.style.width = "240px";
+    container.style.height = "260px";
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: buffer,
+      fileName: "long.xlsx",
+      width: "240px",
+      height: "260px",
+      plugins: [officePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-table-scroll")));
+
+    expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth + 1);
+    expect(container.querySelector(".ofv-tabs button")?.getAttribute("title")).toBe("VeryLongSheetNameForNarrowUI");
+    expect(container.querySelector(".ofv-table-scroll table")).not.toBeNull();
+    expect(container.querySelector('[data-cell="A2"]')?.getAttribute("title")).toBe(
+      "ExtremelyLongCellValueThatShouldNotExpandTheOuterViewerContainer"
+    );
+    expect(container.textContent).toContain("VeryLongSheetNameForNarrowUI");
+  });
+
   it("window-renders large workbook sheets and can page rows and columns", async () => {
     const xlsx = await import("xlsx");
     const rows = Array.from({ length: 205 }, (_row, rowIndex) =>
@@ -453,6 +490,26 @@ describe("officePlugin", () => {
     expect(container.textContent).toContain("Slide summary");
   });
 
+  it("falls back to binary fingerprints when legacy Excel parsing fails", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: createLegacyBinaryBlob(["Revenue forecast", "Gross margin"]),
+      fileName: "legacy.xls",
+      plugins: [officePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-office-binary-meta")));
+
+    expect(container.textContent).toContain(".xls");
+    expect(container.textContent).toContain("Excel Binary File Format");
+    expect(container.textContent).toContain("xlsx 读取失败，已切换二进制指纹");
+    expect(container.textContent).toContain("Revenue forecast");
+    expect(container.textContent).toContain("Gross margin");
+  });
+
   it("sniffs WPS spreadsheet packages and renders compatible workbook previews", async () => {
     const xlsx = await import("xlsx");
     const workbook = xlsx.utils.book_new();
@@ -475,10 +532,32 @@ describe("officePlugin", () => {
     expect(container.querySelector('[data-cell="A2"]')?.textContent).toBe("Ada");
   });
 
-  it("shows iWork package structure for Numbers files that need a dedicated parser", async () => {
+  it("shows iWork package metadata and structure for Numbers files", async () => {
     const zip = new JSZip();
     zip.file("Index/Document.iwa", "binary");
-    zip.file("Metadata/Properties.plist", "plist");
+    zip.file(
+      "Metadata/Properties.plist",
+      `<?xml version="1.0" encoding="UTF-8"?>
+      <plist version="1.0">
+        <dict>
+          <key>Title</key>
+          <string>FY26 Budget</string>
+          <key>Author</key>
+          <string>Ada Lovelace</string>
+          <key>Company</key>
+          <string>Open File Viewer</string>
+          <key>Keywords</key>
+          <array>
+            <string>finance</string>
+            <string>planning</string>
+          </array>
+          <key>CreationDate</key>
+          <date>2026-06-15T08:00:00Z</date>
+          <key>ModificationDate</key>
+          <date>2026-06-15T09:30:00Z</date>
+        </dict>
+      </plist>`
+    );
     const container = document.createElement("div");
     document.body.append(container);
 
@@ -492,6 +571,11 @@ describe("officePlugin", () => {
     await waitFor(() => Boolean(container.querySelector(".ofv-office-package-list")));
 
     expect(container.querySelector(".ofv-office-package-note")?.textContent).toContain("Apple iWork");
+    expect(container.querySelector(".ofv-iwork-meta")?.textContent).toContain("FY26 Budget");
+    expect(container.querySelector(".ofv-iwork-meta")?.textContent).toContain("Ada Lovelace");
+    expect(container.querySelector(".ofv-iwork-meta")?.textContent).toContain("Open File Viewer");
+    expect(container.querySelector(".ofv-iwork-meta")?.textContent).toContain("finance, planning");
+    expect(container.querySelector(".ofv-iwork-meta")?.textContent).toContain("2026-06-15T08:00:00Z");
     expect(container.querySelector(".ofv-office-package-list")?.textContent).toContain("Index/Document.iwa");
     expect(container.querySelector(".ofv-office-package-list")?.textContent).toContain("Metadata/Properties.plist");
   });

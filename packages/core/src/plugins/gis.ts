@@ -129,9 +129,14 @@ export function gisPlugin(): PreviewPlugin {
       }
 
       // 3. Render Leaflet Map
+      const wrapper = document.createElement("div");
+      wrapper.className = "ofv-gis-viewer";
+      wrapper.append(createGisSummary(geojson));
+      ctx.viewport.appendChild(wrapper);
+
       const mapContainer = document.createElement("div");
       mapContainer.className = "ofv-map-stage";
-      ctx.viewport.appendChild(mapContainer);
+      wrapper.appendChild(mapContainer);
 
       const map = Leaflet.map(mapContainer).setView([0, 0], 2);
 
@@ -213,7 +218,7 @@ export function gisPlugin(): PreviewPlugin {
         },
         destroy() {
           map.remove();
-          mapContainer.remove();
+          wrapper.remove();
         }
       };
     }
@@ -238,6 +243,122 @@ function normalizeGisError(error: unknown, fileName: string): string {
 
 function isGisFallback(value: unknown): value is { fallback: HTMLElement } {
   return typeof value === "object" && value !== null && "fallback" in value;
+}
+
+type GisSummary = {
+  features: number;
+  geometryCounts: Map<string, number>;
+  propertyKeys: Set<string>;
+  bounds?: [number, number, number, number];
+};
+
+function createGisSummary(geojson: any): HTMLElement {
+  const summary = summarizeGeoJson(geojson);
+  const bar = document.createElement("div");
+  bar.className = "ofv-gis-summary";
+  appendSummaryItem(bar, "要素", String(summary.features));
+  appendSummaryItem(bar, "几何", formatGeometryCounts(summary.geometryCounts));
+  appendSummaryItem(bar, "属性字段", String(summary.propertyKeys.size));
+  if (summary.propertyKeys.size > 0) {
+    appendSummaryItem(bar, "字段预览", [...summary.propertyKeys].slice(0, 8).join(", "));
+  }
+  if (summary.bounds) {
+    appendSummaryItem(bar, "范围", formatBounds(summary.bounds));
+  }
+  return bar;
+}
+
+function appendSummaryItem(parent: HTMLElement, label: string, value: string): void {
+  const item = document.createElement("span");
+  const key = document.createElement("span");
+  key.textContent = label;
+  const content = document.createElement("strong");
+  content.textContent = value;
+  item.append(key, content);
+  parent.append(item);
+}
+
+function summarizeGeoJson(geojson: any): GisSummary {
+  const summary: GisSummary = {
+    features: 0,
+    geometryCounts: new Map(),
+    propertyKeys: new Set()
+  };
+  for (const feature of collectFeatures(geojson)) {
+    summary.features++;
+    if (feature.properties && typeof feature.properties === "object") {
+      Object.keys(feature.properties).forEach((key) => summary.propertyKeys.add(key));
+    }
+    summarizeGeometry(feature.geometry, summary);
+  }
+  return summary;
+}
+
+function collectFeatures(value: any): any[] {
+  if (!value) {
+    return [];
+  }
+  if (value.type === "FeatureCollection" && Array.isArray(value.features)) {
+    return value.features;
+  }
+  if (value.type === "Feature") {
+    return [value];
+  }
+  if (value.type && value.coordinates) {
+    return [{ type: "Feature", properties: {}, geometry: value }];
+  }
+  return [];
+}
+
+function summarizeGeometry(geometry: any, summary: GisSummary): void {
+  if (!geometry) {
+    summary.geometryCounts.set("None", (summary.geometryCounts.get("None") || 0) + 1);
+    return;
+  }
+  const type = String(geometry.type || "Unknown");
+  summary.geometryCounts.set(type, (summary.geometryCounts.get(type) || 0) + 1);
+  if (type === "GeometryCollection" && Array.isArray(geometry.geometries)) {
+    for (const child of geometry.geometries) {
+      summarizeGeometry(child, summary);
+    }
+    return;
+  }
+  updateBounds(summary, geometry.coordinates);
+}
+
+function updateBounds(summary: GisSummary, coordinates: unknown): void {
+  if (!Array.isArray(coordinates)) {
+    return;
+  }
+  if (typeof coordinates[0] === "number" && typeof coordinates[1] === "number") {
+    const lon = coordinates[0];
+    const lat = coordinates[1];
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+      return;
+    }
+    const bounds = summary.bounds || [lon, lat, lon, lat];
+    bounds[0] = Math.min(bounds[0], lon);
+    bounds[1] = Math.min(bounds[1], lat);
+    bounds[2] = Math.max(bounds[2], lon);
+    bounds[3] = Math.max(bounds[3], lat);
+    summary.bounds = bounds;
+    return;
+  }
+  for (const item of coordinates) {
+    updateBounds(summary, item);
+  }
+}
+
+function formatGeometryCounts(counts: Map<string, number>): string {
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([type, count]) => `${type} ${count}`)
+    .join(", ") || "无";
+}
+
+function formatBounds(bounds: [number, number, number, number]): string {
+  return bounds.map((value) => Number(value.toFixed(5))).join(", ");
 }
 
 async function parseToGeoJson(

@@ -9,6 +9,7 @@ describe("core responsive styles", () => {
   it("keeps the preview shell constrained to its host container", () => {
     expect(rule(".ofv-root")).toContain("max-width: 100%");
     expect(rule(".ofv-root")).toContain("min-width: 0");
+    expect(rule(".ofv-root [hidden]")).toContain("display: none !important");
     expect(rule(".ofv-host")).toContain("min-width: 0");
     expect(rule(".ofv-host")).toContain("overflow: hidden");
     expect(rule(".ofv-viewport")).toContain("min-width: 0");
@@ -21,12 +22,35 @@ describe("core responsive styles", () => {
     expect(rule(".ofv-toolbar-search")).toContain("flex: 1 1 180px");
     expect(rule(".ofv-toolbar-search")).toContain("min-width: 0");
     expect(rule(".ofv-toolbar-search input")).toContain("min-width: 0");
+    expect(rule(".ofv-toolbar button")).toContain("min-width: 0");
+    expect(rule(".ofv-toolbar button")).toContain("overflow: hidden");
+    expect(rule(".ofv-toolbar button")).toContain("text-overflow: ellipsis");
+    expect(rule(".ofv-image-controls")).toContain("flex-wrap: wrap");
+    expect(rule(".ofv-image-controls button")).toContain("min-width: 0");
+    expect(rule(".ofv-image-controls button")).toContain("overflow: hidden");
+    expect(rule(".ofv-image-controls button")).toContain("text-overflow: ellipsis");
+    expect(rule(".ofv-image-info")).toContain("max-width: 100%");
+    expect(rule(".ofv-image-info-item")).toContain("max-width: 100%");
+    expect(rule(".ofv-image-info-item")).toContain("overflow-wrap: anywhere");
   });
 
   it("keeps large document, code, markdown, and PDF content inside local scroll regions", () => {
     const docxWrapper = rule(".ofv-docx-document .ofv-docx-wrapper");
+    const docxSection = rule(".ofv-docx-document section.ofv-docx");
     expect(docxWrapper).not.toContain("min-width: max-content");
+    expect(docxWrapper).not.toContain("width: max-content");
+    expect(docxWrapper).toContain("width: 100%");
     expect(docxWrapper).toContain("max-width: 100%");
+    expect(docxWrapper).toContain("overflow: auto");
+    expect(docxWrapper).toContain("box-sizing: border-box");
+    expect(docxSection).toContain("max-width: 100%");
+    expect(docxSection).toContain("overflow: auto");
+    expect(docxSection).toContain("overflow-wrap: anywhere");
+    expect(
+      rule(
+        ".ofv-docx-document section.ofv-docx img,\n.ofv-docx-document section.ofv-docx svg,\n.ofv-docx-document section.ofv-docx canvas,\n.ofv-docx-document section.ofv-docx video"
+      )
+    ).toContain("max-width: 100%");
     expect(rule(".ofv-code-container")).toContain("max-width: 100%");
     expect(rule(".ofv-code-body")).toContain("overflow: auto");
     expect(rule(".ofv-markdown-body")).toContain("overflow: auto");
@@ -39,13 +63,24 @@ describe("core responsive styles", () => {
     expect(rule(".ofv-section")).toContain("min-width: 0");
     expect(rule(".ofv-tabs")).toContain("flex-wrap: wrap");
     expect(rule(".ofv-tabs")).toContain("min-width: 0");
+    expect(rule(".ofv-tabs button")).toContain("overflow: hidden");
+    expect(rule(".ofv-tabs button")).toContain("overflow-wrap: anywhere");
+    expect(rule(".ofv-tabs button")).toContain("text-overflow: ellipsis");
     expect(rule(".ofv-table-scroll")).toContain("max-width: 100%");
     expect(rule(".ofv-table-scroll")).toContain("overflow: auto");
+    expect(rule(".ofv-table-scroll td,\n.ofv-table-scroll th")).toContain("text-overflow: ellipsis");
     expect(rule(".ofv-sheet-window")).toContain("flex-wrap: wrap");
     expect(rule(".ofv-sheet-window")).toContain("min-width: 0");
+    expect(rule(".ofv-sheet-window-note")).toContain("min-width: 0");
+    expect(rule(".ofv-sheet-window-note")).toContain("overflow-wrap: anywhere");
+    expect(rule(".ofv-sheet-window button")).toContain("overflow-wrap: anywhere");
     expect(rule(".ofv-chart-card")).toContain("min-width: 0");
     expect(rule(".ofv-presentation-summary")).toContain("min-width: 0");
     expect(rule(".ofv-presentation-slides")).toContain("min-width: 0");
+    expect(rule(".ofv-slide")).toContain("overflow-wrap: anywhere");
+    expect(rule(".ofv-pptx-viewer")).toContain("overflow: auto");
+    expect(rule(".ofv-pptx-viewer > div[data-slide-index]")).toContain("max-width: 100%");
+    expect(rule(".ofv-pptx-viewer > div[data-slide-index]")).toContain("overflow: auto");
   });
 
   it("keeps specialized preview surfaces constrained and locally scrollable", () => {

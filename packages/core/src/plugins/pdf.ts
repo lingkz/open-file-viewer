@@ -32,14 +32,19 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
       configurePdfWorker(pdf, normalizedOptions.workerSrc);
       const url = createObjectUrl(ctx.file);
       const isExternal = Boolean(ctx.file.url);
-      
+
+      const viewer = document.createElement("div");
+      viewer.className = "ofv-pdf-viewer";
+      const summary = document.createElement("div");
+      summary.className = "ofv-pdf-summary";
       const scroller = document.createElement("div");
-      scroller.className = "ofv-pdf";
-      ctx.viewport.append(scroller);
+      scroller.className = "ofv-pdf ofv-pdf-pages";
+      viewer.append(summary, scroller);
+      ctx.viewport.append(viewer);
 
       const documentTask = pdf.getDocument(url);
       const doc = await documentTask.promise.catch((error: unknown) => {
-        scroller.remove();
+        viewer.remove();
         ctx.viewport.classList.add("ofv-center");
         const fallback = createPdfFallback(ctx.file.name, url, normalizePdfError(error));
         ctx.viewport.append(fallback);
@@ -80,6 +85,10 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
       let observer: IntersectionObserver | null = null;
       let currentSize = ctx.size;
       let zoomFactor = 1;
+
+      const updateSummary = () => {
+        renderPdfSummary(summary, doc.numPages, pagesMeta, ctx.options.fit, zoomFactor);
+      };
 
       // Cancel page rendering and free canvas memory
       const clearPage = (pageIdx: number) => {
@@ -184,6 +193,7 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
 
       const renderLayout = (size: PreviewSize) => {
         observer?.disconnect();
+        updateSummary();
         scroller.replaceChildren();
         pageStates.length = 0;
 
@@ -300,6 +310,46 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
       };
     }
   };
+}
+
+function renderPdfSummary(
+  summary: HTMLElement,
+  pages: number,
+  pagesMeta: Array<{ width: number; height: number }>,
+  fit: string,
+  zoomFactor: number
+): void {
+  summary.replaceChildren();
+  appendPdfSummary(summary, "页数", String(pages));
+  const pageSizes = formatPdfPageSizes(pagesMeta);
+  if (pageSizes) {
+    appendPdfSummary(summary, "页面尺寸", pageSizes);
+  }
+  appendPdfSummary(summary, "适配", fit === "actual" ? "原始大小" : "适合宽度");
+  appendPdfSummary(summary, "缩放", `${Math.round(zoomFactor * 100)}%`);
+}
+
+function appendPdfSummary(parent: HTMLElement, label: string, value: string): void {
+  const item = document.createElement("span");
+  const key = document.createElement("span");
+  key.textContent = label;
+  const content = document.createElement("strong");
+  content.textContent = value;
+  item.append(key, content);
+  parent.append(item);
+}
+
+function formatPdfPageSizes(pagesMeta: Array<{ width: number; height: number }>): string {
+  const counts = new Map<string, number>();
+  for (const page of pagesMeta) {
+    const key = `${Math.round(page.width)} x ${Math.round(page.height)}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([size, count]) => (count > 1 ? `${size} (${count})` : size))
+    .join(", ");
 }
 
 function normalizePdfOptions(options: PdfJsModule | PdfPluginOptions): PdfPluginOptions {

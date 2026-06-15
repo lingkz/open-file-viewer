@@ -81,6 +81,121 @@ describe("imagePlugin", () => {
     viewer.destroy();
   });
 
+  it("renders PNG header metadata below the image", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:png-info"),
+      revokeObjectURL: vi.fn()
+    });
+
+    const viewer = createViewer({
+      container,
+      file: minimalPng({ width: 320, height: 180, colorType: 6 }),
+      fileName: "poster.png",
+      plugins: [imagePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-image-info")));
+
+    expect(container.textContent).toContain("格式PNG");
+    expect(container.textContent).toContain("尺寸320 x 180px");
+    expect(container.textContent).toContain("位深8 bit");
+    expect(container.textContent).toContain("Truecolor + alpha");
+
+    viewer.destroy();
+  });
+
+  it("renders SVG and ICO structural metadata", async () => {
+    const svgContainer = document.createElement("div");
+    document.body.append(svgContainer);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:image-info"),
+      revokeObjectURL: vi.fn()
+    });
+
+    const svgViewer = createViewer({
+      container: svgContainer,
+      file: new Blob(['<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg"></svg>'], { type: "image/svg+xml" }),
+      fileName: "diagram.svg",
+      plugins: [imagePlugin()]
+    });
+
+    await waitFor(() => Boolean(svgContainer.querySelector(".ofv-image-info")));
+    expect(svgContainer.textContent).toContain("格式SVG");
+    expect(svgContainer.textContent).toContain("尺寸640 x 360px");
+    expect(svgContainer.textContent).toContain("viewBox 0 0 640 360");
+    svgViewer.destroy();
+
+    const icoContainer = document.createElement("div");
+    document.body.append(icoContainer);
+    const icoViewer = createViewer({
+      container: icoContainer,
+      file: minimalIco(),
+      fileName: "app.ico",
+      plugins: [imagePlugin()]
+    });
+
+    await waitFor(() => Boolean(icoContainer.querySelector(".ofv-image-info")));
+    expect(icoContainer.textContent).toContain("格式ICO");
+    expect(icoContainer.textContent).toContain("尺寸32 x 32px");
+    expect(icoContainer.textContent).toContain("图像2");
+    icoViewer.destroy();
+  });
+
+  it("counts APNG animation control chunks", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:apng-info"),
+      revokeObjectURL: vi.fn()
+    });
+
+    const viewer = createViewer({
+      container,
+      file: minimalPng({ width: 64, height: 64, frames: 2 }),
+      fileName: "anim.apng",
+      plugins: [imagePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-image-info")));
+
+    expect(container.textContent).toContain("格式APNG");
+    expect(container.textContent).toContain("帧2");
+
+    viewer.destroy();
+  });
+
+  it("renders AVIF BMFF brand and image spatial extent metadata", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:avif-info"),
+      revokeObjectURL: vi.fn()
+    });
+
+    const viewer = createViewer({
+      container,
+      file: minimalAvif({ width: 1024, height: 576 }),
+      fileName: "frame.avif",
+      plugins: [imagePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-image-info")));
+
+    expect(container.textContent).toContain("格式AVIF");
+    expect(container.textContent).toContain("尺寸1024 x 576px");
+    expect(container.textContent).toContain("brand avif");
+    expect(container.textContent).toContain("mif1");
+
+    viewer.destroy();
+  });
+
   it("converts HEIC images to a browser-displayable object URL", async () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -259,6 +374,85 @@ describe("imagePlugin", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:raw-heic");
   });
 });
+
+function minimalPng({ width, height, colorType = 2, frames = 0 }: { width: number; height: number; colorType?: number; frames?: number }): Blob {
+  const chunks: number[] = [
+    ...pngChunk("IHDR", [
+      ...uint32Be(width),
+      ...uint32Be(height),
+      8,
+      colorType,
+      0,
+      0,
+      0
+    ])
+  ];
+  for (let index = 0; index < frames; index++) {
+    chunks.push(...pngChunk("fcTL", new Array(26).fill(0)));
+  }
+  chunks.push(...pngChunk("IEND", []));
+  return new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...chunks])], { type: "image/png" });
+}
+
+function minimalIco(): Blob {
+  const bytes = new Uint8Array(6 + 2 * 16);
+  const view = new DataView(bytes.buffer);
+  view.setUint16(0, 0, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, 2, true);
+  bytes[6] = 32;
+  bytes[7] = 32;
+  bytes[8] = 0;
+  bytes[9] = 0;
+  view.setUint16(10, 1, true);
+  view.setUint16(12, 32, true);
+  view.setUint32(14, 4, true);
+  view.setUint32(18, bytes.length, true);
+  bytes[22] = 16;
+  bytes[23] = 16;
+  view.setUint16(26, 1, true);
+  view.setUint16(28, 32, true);
+  view.setUint32(30, 4, true);
+  view.setUint32(34, bytes.length + 4, true);
+  return new Blob([bytes], { type: "image/x-icon" });
+}
+
+function minimalAvif({ width, height }: { width: number; height: number }): Blob {
+  const ftyp = bmffBox("ftyp", [
+    ...ascii("avif"),
+    ...uint32Be(0),
+    ...ascii("avif"),
+    ...ascii("mif1")
+  ]);
+  const ispe = bmffBox("ispe", [
+    0,
+    0,
+    0,
+    0,
+    ...uint32Be(width),
+    ...uint32Be(height)
+  ]);
+  const ipco = bmffBox("ipco", ispe);
+  const iprp = bmffBox("iprp", ipco);
+  const meta = bmffBox("meta", [0, 0, 0, 0, ...iprp]);
+  return new Blob([new Uint8Array([...ftyp, ...meta])], { type: "image/avif" });
+}
+
+function bmffBox(type: string, payload: number[]): number[] {
+  return [...uint32Be(payload.length + 8), ...ascii(type), ...payload];
+}
+
+function pngChunk(type: string, data: number[]): number[] {
+  return [...uint32Be(data.length), ...new TextEncoder().encode(type), ...data, 0, 0, 0, 0];
+}
+
+function ascii(value: string): number[] {
+  return [...new TextEncoder().encode(value)];
+}
+
+function uint32Be(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+}
 
 async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> {
   const start = Date.now();
