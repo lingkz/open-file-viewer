@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const packageDirs = ["packages/core", "packages/react", "packages/vue"];
+const packageDirs = ["packages/core", "packages/react", "packages/vue", "packages/svelte"];
 
 let failed = false;
 

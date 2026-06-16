@@ -703,6 +703,26 @@ h1 {
   box-shadow: inset 0 0 0 1px rgba(65, 184, 131, 0.18);
 }
 
+.svelte-logo {
+  background: #fff7f2;
+  box-shadow: inset 0 0 0 1px rgba(255, 62, 0, 0.18);
+}
+
+.svelte-logo svg {
+  width: 18px;
+  height: 21.5px;
+  fill: none;
+  stroke: none;
+}
+
+.svelte-logo path:first-child {
+  fill: #ff3e00;
+}
+
+.svelte-logo path:last-child {
+  fill: #ffffff;
+}
+
 .react-logo svg {
   width: 20px;
   height: 20px;
@@ -732,6 +752,10 @@ h1 {
 
 :root[data-site-theme="dark"] .vue-logo {
   background: rgba(244, 255, 248, 0.96);
+}
+
+:root[data-site-theme="dark"] .svelte-logo {
+  background: rgba(255, 247, 242, 0.96);
 }
 
 .works-with strong:nth-child(1) {
@@ -1617,7 +1641,46 @@ pre .token.important {
   white-space: nowrap;
 }
 
+.url-preview-control {
+  display: grid;
+  gap: 8px;
+}
+
+.url-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.url-preview-row input {
+  min-width: 0;
+}
+
+.url-preview-row button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--brand) 32%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand) 14%, var(--surface));
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.url-preview-row button:hover {
+  border-color: color-mix(in srgb, var(--brand) 54%, var(--border));
+  background: color-mix(in srgb, var(--brand) 22%, var(--surface));
+  transform: translateY(-1px);
+}
+
 .file-drop small,
+.url-preview-control small,
 .current-file span,
 .controls-card label > span:not(.file-picker-row) {
   color: var(--muted);
@@ -2440,6 +2503,14 @@ pre .token.important {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .url-preview-row {
+    grid-template-columns: 1fr;
+  }
+
+  .url-preview-row button {
+    width: 100%;
+  }
+
   .api-row {
     grid-template-columns: 1fr;
   }
@@ -2463,6 +2534,7 @@ pre .token.important {
   }
 
   .file-picker-row,
+  .url-preview-row,
   .control-grid {
     grid-template-columns: 1fr;
   }

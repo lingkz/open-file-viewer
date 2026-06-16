@@ -34,7 +34,7 @@ Prism.manual = true;
 
 type Language = "zh" | "en";
 type SiteTheme = "dark" | "light";
-type CodeTab = "vanilla" | "react" | "vue";
+type CodeTab = "vanilla" | "react" | "vue" | "svelte";
 
 interface DemoFile {
   label: Record<Language, string>;
@@ -62,11 +62,11 @@ const translations: Record<Language, Record<string, string>> = {
     "hero.badge": "开源文件预览 SDK",
     "hero.title": "面向现代 Web 的文件预览基础设施",
     "hero.lede":
-      "一个兼容原生 JavaScript、React 和 Vue 的嵌入式文件预览器。把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和工程文件放进同一个稳定容器。",
+      "一个兼容原生 JavaScript、React、Vue 和 Svelte 的嵌入式文件预览器。把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和工程文件放进同一个稳定容器。",
     "hero.primary": "开始集成",
     "hero.secondary": "在线体验",
     "hero.tertiary": "查看格式",
-    "hero.works": "原生 JS、Vue、React 全兼容",
+    "hero.works": "原生 JS、Vue、React、Svelte 全兼容",
     "ways.eyebrow": "两种集成方式",
     "ways.title": "直接嵌入默认预览器，或基于插件构建自己的文件工作台。",
     "ways.dropin.label": "Drop-in",
@@ -74,16 +74,16 @@ const translations: Record<Language, Record<string, string>> = {
     "ways.dropin.desc": "用内置 UI 快速上线，获得工具栏、主题、多文件队列、容器自适应和失败降级。",
     "ways.headless.label": "Composable",
     "ways.headless.title": "Plugin-first Core",
-    "ways.headless.desc": "通过插件协议接入自定义渲染器、WASM 或服务端转换结果，React/Vue/原生 JS 共用同一核心。",
+    "ways.headless.desc": "通过插件协议接入自定义渲染器、WASM 或服务端转换结果，React/Vue/Svelte/原生 JS 共用同一核心。",
     "feature.one.title": "Batteries included",
     "feature.one.desc": "PDF、Office、OFD、EPUB、XPS、图片、音视频、压缩包、邮件、CAD、GIS、3D 和文本插件开箱可用。",
     "feature.two.title": "Framework agnostic",
-    "feature.two.desc": "原生 JavaScript、React 和 Vue 使用同一套 core 能力，方便团队跨产品复用。",
+    "feature.two.desc": "原生 JavaScript、React、Vue 和 Svelte 使用同一套 core 能力，方便团队跨产品复用。",
     "feature.three.title": "Container-first",
     "feature.three.desc": "所有预览都在你的 DOM 容器内完成，支持尺寸变化、黑色模式、下载和错误边界。",
     "integration.eyebrow": "框架兼容",
-    "integration.title": "Vanilla JS、React、Vue 都能快速接入。",
-    "integration.desc": "选择 Vanilla JS、React 或 Vue。底层插件一致，UI 可以先用默认组件，再逐步定制。",
+    "integration.title": "Vanilla JS、React、Vue、Svelte 都能快速接入。",
+    "integration.desc": "选择 Vanilla JS、React、Vue 或 Svelte。底层插件一致，UI 可以先用默认组件，再逐步定制。",
     "playground.eyebrow": "Try it live",
     "playground.title": "Drop files and preview them instantly.",
     "playground.desc": "本地文件只在浏览器内读取，不会上传。你也可以用内置示例体验 Markdown、JSON、Word、Excel、PowerPoint、SVG 和 DXF。",
@@ -92,6 +92,9 @@ const translations: Record<Language, Record<string, string>> = {
     "playground.chooseFile": "选择文件",
     "playground.noFile": "未选择文件",
     "playground.sample": "Built-in sample",
+    "playground.urlLabel": "文件链接",
+    "playground.urlAction": "预览链接",
+    "playground.urlHint": "请输入允许跨域访问的公开文件 URL。",
     "playground.width": "Width",
     "playground.height": "Height",
     "playground.fit": "Fit",
@@ -119,7 +122,7 @@ const translations: Record<Language, Record<string, string>> = {
     "hero.badge": "Open source file preview SDK",
     "hero.title": "Preview any file without the pain",
     "hero.lede":
-      "A framework-agnostic embedded file viewer for vanilla JavaScript, React and Vue. Put PDF, Office, images, media, archives, email, drawings, 3D, GIS and engineering files inside one stable container.",
+      "A framework-agnostic embedded file viewer for vanilla JavaScript, React, Vue and Svelte. Put PDF, Office, images, media, archives, email, drawings, 3D, GIS and engineering files inside one stable container.",
     "hero.primary": "Get Started",
     "hero.secondary": "Live Demo",
     "hero.tertiary": "Formats",
@@ -131,16 +134,16 @@ const translations: Record<Language, Record<string, string>> = {
     "ways.dropin.desc": "Ship quickly with toolbar, themes, multi-file queues, responsive containers and tested fallbacks.",
     "ways.headless.label": "Composable",
     "ways.headless.title": "Plugin-first Core",
-    "ways.headless.desc": "Attach custom renderers, WASM pipelines or server-converted output while React, Vue and vanilla JS share one core.",
+    "ways.headless.desc": "Attach custom renderers, WASM pipelines or server-converted output while React, Vue, Svelte and vanilla JS share one core.",
     "feature.one.title": "Batteries included",
     "feature.one.desc": "PDF, Office, OFD, EPUB, XPS, image, media, archive, email, CAD, GIS, 3D and text plugins are ready to use.",
     "feature.two.title": "Framework agnostic",
-    "feature.two.desc": "Vanilla JavaScript, React and Vue share the same core so teams can reuse one preview strategy across products.",
+    "feature.two.desc": "Vanilla JavaScript, React, Vue and Svelte share the same core so teams can reuse one preview strategy across products.",
     "feature.three.title": "Container-first",
     "feature.three.desc": "Every preview stays inside your DOM container with resize handling, dark mode, downloads and error boundaries.",
     "integration.eyebrow": "Drop-in Integration",
     "integration.title": "Add a viewer in minutes.",
-    "integration.desc": "Pick Vanilla JS, React or Vue. The plugin capability stays consistent, while the UI can start default and evolve later.",
+    "integration.desc": "Pick Vanilla JS, React, Vue or Svelte. The plugin capability stays consistent, while the UI can start default and evolve later.",
     "playground.eyebrow": "Try it live",
     "playground.title": "Drop files and preview them instantly.",
     "playground.desc": "Local files stay in your browser and are not uploaded. Built-in samples cover Markdown, JSON, Word, Excel, PowerPoint, SVG and DXF.",
@@ -149,6 +152,9 @@ const translations: Record<Language, Record<string, string>> = {
     "playground.chooseFile": "Choose files",
     "playground.noFile": "No file selected",
     "playground.sample": "Built-in sample",
+    "playground.urlLabel": "File URL",
+    "playground.urlAction": "Preview URL",
+    "playground.urlHint": "Use a public URL with CORS enabled.",
     "playground.width": "Width",
     "playground.height": "Height",
     "playground.fit": "Fit",
@@ -178,6 +184,7 @@ const apiOptions: ApiRow[] = [
   { name: "toolbar", type: "boolean | PreviewToolbarOptions", description: { zh: "工具栏配置。支持开关、文案、顺序、图标、业务按钮和完全自定义渲染。", en: "Toolbar configuration with toggles, labels, order, icons, custom actions and full rendering." } },
   { name: "renderToolbar", type: "React prop", description: { zh: "React 适配器的自定义工具栏 render prop。", en: "Custom toolbar render prop for the React adapter." } },
   { name: "#toolbar", type: "Vue slot", description: { zh: "Vue 适配器的自定义工具栏插槽。", en: "Custom toolbar slot for the Vue adapter." } },
+  { name: "slot=\"toolbar\"", type: "Svelte slot", description: { zh: "Svelte 适配器的自定义工具栏插槽。", en: "Custom toolbar slot for the Svelte adapter." } },
   { name: "theme", type: "light | dark | auto", description: { zh: "预览器主题。", en: "Viewer theme." } },
   { name: "onLoad / onError", type: "callback", description: { zh: "加载完成和错误回调。", en: "Lifecycle callbacks for load and error states." } }
 ];
@@ -203,6 +210,10 @@ const frameworkCopy: Record<CodeTab, Record<Language, string>> = {
   vue: {
     zh: "适合 Vue 业务系统和组合式项目，通过 props 传递文件、尺寸、插件和主题。",
     en: "Designed for Vue business apps and composition-friendly projects."
+  },
+  svelte: {
+    zh: "适合 Svelte / SvelteKit 项目，通过组件属性和 toolbar slot 接入默认或业务化工具栏。",
+    en: "Designed for Svelte and SvelteKit apps with props plus a toolbar slot for product-specific controls."
   }
 };
 
@@ -237,13 +248,23 @@ const plugins = [imagePlugin(), pdfPlugin({ workerSrc }), officePlugin(), textPl
 
 <template>
   <OpenFileViewer :file="file" :file-name="file.name" height="640px" toolbar :plugins="plugins" />
-</template>`
+</template>`,
+  svelte: `<script lang="ts">
+import { OpenFileViewer } from "@open-file-viewer/svelte";
+import { imagePlugin, pdfPlugin, officePlugin, textPlugin } from "@open-file-viewer/core";
+
+export let file: File;
+const plugins = [imagePlugin(), pdfPlugin({ workerSrc }), officePlugin(), textPlugin()];
+</script>
+
+<OpenFileViewer {file} fileName={file.name} height="640px" toolbar {plugins} />`
 };
 
 const codeLanguages: Record<CodeTab, string> = {
   vanilla: "typescript",
   react: "tsx",
-  vue: "markup"
+  vue: "markup",
+  svelte: "markup"
 };
 
 const pluginCode = `import type { PreviewPlugin } from "@open-file-viewer/core";
@@ -294,7 +315,8 @@ const toolbarCode = `createViewer({
 });
 
 // React: <FileViewer renderToolbar={(ctx) => <button onClick={ctx.download}>下载</button>} />
-// Vue: <template #toolbar="ctx"><button @click="ctx.download()">下载</button></template>`;
+// Vue: <template #toolbar="ctx"><button @click="ctx.download()">下载</button></template>
+// Svelte: <button slot="toolbar" let:ctx on:click={ctx.download}>下载</button>`;
 
 const demoFiles: DemoFile[] = [
   {
@@ -305,7 +327,7 @@ const demoFiles: DemoFile[] = [
 
 Embed file previews inside any product surface.
 
-- Vanilla JavaScript, React and Vue
+- Vanilla JavaScript, React, Vue and Svelte
 - Multi-format plugin architecture
 - Responsive container-first preview
 
@@ -320,7 +342,7 @@ createViewer({ container: "#viewer", file, plugins });
   },
   {
     label: { zh: "API JSON", en: "API JSON" },
-    file: new File([JSON.stringify({ package: "@open-file-viewer/core", api: "createViewer", frameworks: ["vanilla", "react", "vue"] }, null, 2)], "api.json", {
+    file: new File([JSON.stringify({ package: "@open-file-viewer/core", api: "createViewer", frameworks: ["vanilla", "react", "vue", "svelte"] }, null, 2)], "api.json", {
       type: "application/json"
     })
   },
@@ -1018,6 +1040,8 @@ function crc32(bytes: Uint8Array): number {
 const container = requiredElement<HTMLElement>("#viewer");
 const fileInput = requiredElement<HTMLInputElement>("#file");
 const sampleInput = requiredElement<HTMLSelectElement>("#sample");
+const fileUrlInput = requiredElement<HTMLInputElement>("#fileUrl");
+const previewUrlButton = requiredElement<HTMLButtonElement>("#previewUrl");
 const widthInput = requiredElement<HTMLInputElement>("#width");
 const heightInput = requiredElement<HTMLInputElement>("#height");
 const fitInput = requiredElement<HTMLSelectElement>("#fit");
@@ -1038,7 +1062,8 @@ const tabletViewerHeight = "min(560px, 62vh)";
 const phoneViewerHeight = "min(520px, 60vh)";
 
 let viewer: FileViewer | null = null;
-let currentFiles: Array<File | Blob> = [demoFiles[0].file];
+let currentFiles: Array<File | Blob | string> = [demoFiles[0].file];
+let currentFileName: string | undefined;
 let language: Language = readStorage("ofv-language") === "en" ? "en" : "zh";
 let siteTheme: SiteTheme = readStorage("ofv-site-theme") === "dark" ? "dark" : "light";
 let activeCodeTab: CodeTab = "vanilla";
@@ -1072,7 +1097,7 @@ function renderViewer() {
     container,
     file: firstFile,
     files: currentFiles,
-    fileName: firstFile instanceof File ? firstFile.name : "preview.bin",
+    fileName: firstFile instanceof File ? firstFile.name : currentFileName || inferFileNameFromSource(firstFile),
     width: widthInput.value,
     height: heightInput.value,
     fit: fitInput.value as PreviewFit,
@@ -1086,6 +1111,24 @@ function renderViewer() {
       console.error(error);
     }
   });
+}
+
+function inferFileNameFromSource(source: File | Blob | string): string {
+  if (source instanceof File) {
+    return source.name;
+  }
+  if (typeof source !== "string") {
+    return "preview.bin";
+  }
+  try {
+    const url = new URL(source, window.location.href);
+    const pathname = decodeURIComponent(url.pathname);
+    const name = pathname.split("/").filter(Boolean).pop();
+    return name || "remote-file";
+  } catch {
+    const name = source.split(/[?#]/, 1)[0]?.split("/").filter(Boolean).pop();
+    return name || "remote-file";
+  }
 }
 
 function getResponsiveViewerHeight() {
@@ -1287,6 +1330,8 @@ fileInput.addEventListener("change", () => {
     return;
   }
   currentFiles = files;
+  currentFileName = undefined;
+  fileUrlInput.value = "";
   updateFilePickerLabel();
   renderViewer();
 });
@@ -1294,8 +1339,35 @@ fileInput.addEventListener("change", () => {
 sampleInput.addEventListener("change", () => {
   const demo = demoFiles[Number(sampleInput.value)] || demoFiles[0];
   currentFiles = [demo.file];
+  currentFileName = demo.file.name;
+  fileUrlInput.value = "";
+  updateFilePickerLabel();
   renderViewer();
 });
+
+previewUrlButton.addEventListener("click", () => {
+  previewRemoteUrl();
+});
+
+fileUrlInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    previewRemoteUrl();
+  }
+});
+
+function previewRemoteUrl() {
+  const url = fileUrlInput.value.trim();
+  if (!url) {
+    fileUrlInput.focus();
+    return;
+  }
+  currentFiles = [url];
+  currentFileName = inferFileNameFromSource(url);
+  fileInput.value = "";
+  updateFilePickerLabel();
+  renderViewer();
+}
 
 heightInput.addEventListener("input", () => {
   viewerHeightIsResponsive = false;

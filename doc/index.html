@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Open File Viewer is a framework-agnostic file preview SDK for vanilla JavaScript, React and Vue."
+      content="Open File Viewer is a framework-agnostic file preview SDK for vanilla JavaScript, React, Vue and Svelte."
     />
     <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#080912" media="(prefers-color-scheme: dark)" />
@@ -61,7 +61,7 @@
         transition: none !important;
       }
     </style>
-    <title>Open File Viewer - File Preview SDK for JS, React and Vue</title>
+    <title>Open File Viewer - File Preview SDK for JS, React, Vue and Svelte</title>
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -186,7 +186,7 @@
         <div class="hero-badge" data-i18n="hero.badge">开源文件预览 SDK</div>
         <h1 data-i18n="hero.title">面向现代 Web 的文件预览基础设施</h1>
         <p data-i18n="hero.lede">
-          一个兼容原生 JavaScript、React 和 Vue 的嵌入式文件预览器。把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和工程文件放进同一个稳定容器。
+          一个兼容原生 JavaScript、React、Vue 和 Svelte 的嵌入式文件预览器。把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和工程文件放进同一个稳定容器。
         </p>
         <div class="hero-actions">
           <a class="primary-button" href="#docs"><span data-i18n="hero.primary">Get Started</span><svg><use href="#icon-arrow"></use></svg></a>
@@ -217,6 +217,15 @@
                 </svg>
               </span>
               Vue
+            </strong>
+            <strong>
+              <span class="logo-chip svelte-logo" aria-hidden="true">
+                <svg viewBox="0 0 107 128" preserveAspectRatio="xMidYMid meet" focusable="false">
+                  <path d="M94.1566 22.8189c-10.4-14.8851-30.94-19.2971-45.7914-9.8348L22.2825 29.6078A29.9234 29.9234 0 0 0 8.7639 49.6506a31.5136 31.5136 0 0 0 3.1076 20.2318A30.0061 30.0061 0 0 0 7.3953 81.0653a31.8886 31.8886 0 0 0 5.4473 24.1157c10.4022 14.8865 30.9423 19.2966 45.7914 9.8348l26.0827-16.6237A29.9177 29.9177 0 0 0 98.2353 78.3493 31.5263 31.5263 0 0 0 95.13 58.117a30 30 0 0 0 4.4743-11.1824 31.88 31.88 0 0 0-5.4473-24.1157"></path>
+                  <path d="M45.8171 106.5815A20.7182 20.7182 0 0 1 23.58 98.3389a19.1739 19.1739 0 0 1-3.2766-14.5025 18.1886 18.1886 0 0 1 .6233-2.4357l.4912-1.4978 1.3363.9815a33.6443 33.6443 0 0 0 10.203 5.0978l.9694.2941-.0893.9675a5.8474 5.8474 0 0 0 1.052 3.8781 6.2389 6.2389 0 0 0 6.6952 2.485 5.7449 5.7449 0 0 0 1.6021-.7041L69.27 76.281a5.4306 5.4306 0 0 0 2.4506-3.631 5.7948 5.7948 0 0 0-.9875-4.3712 6.2436 6.2436 0 0 0-6.6978-2.4864 5.7427 5.7427 0 0 0-1.6.7036l-9.9532 6.3449a19.0329 19.0329 0 0 1-5.2965 2.3259 20.7181 20.7181 0 0 1-22.2368-8.2427 19.1725 19.1725 0 0 1-3.2766-14.5024 17.9885 17.9885 0 0 1 8.13-12.0513l26.0811-16.6232a19.0038 19.0038 0 0 1 5.3-2.3287A20.7182 20.7182 0 0 1 83.42 29.6611a19.1739 19.1739 0 0 1 3.2766 14.5025 18.4 18.4 0 0 1-.6233 2.4357l-.4912 1.4978-1.3356-.98a33.6175 33.6175 0 0 0-10.2037-5.1l-.9694-.2942.0893-.9675a5.8588 5.8588 0 0 0-1.052-3.878 6.2389 6.2389 0 0 0-6.6952-2.485 5.7449 5.7449 0 0 0-1.6021.7041L37.73 51.719a5.4218 5.4218 0 0 0-2.4487 3.63 5.7862 5.7862 0 0 0 .9856 4.3717 6.2437 6.2437 0 0 0 6.6978 2.4864 5.7652 5.7652 0 0 0 1.602-.7041l9.9519-6.3425a18.978 18.978 0 0 1 5.2959-2.3278 20.7181 20.7181 0 0 1 22.2368 8.2427 19.1725 19.1725 0 0 1 3.2766 14.5024 17.9977 17.9977 0 0 1-8.13 12.0532l-26.0812 16.6218a19.0038 19.0038 0 0 1-5.3 2.3287"></path>
+                </svg>
+              </span>
+              Svelte
             </strong>
           </div>
         </div>
@@ -280,7 +289,7 @@
           <article>
             <span><svg><use href="#icon-puzzle"></use></svg><span data-i18n="ways.headless.label">Composable</span></span>
             <h3 data-i18n="ways.headless.title">Plugin-first Core</h3>
-            <p data-i18n="ways.headless.desc">通过插件协议接入自定义渲染器、WASM 或服务端转换结果，React/Vue/原生 JS 共用同一核心。</p>
+            <p data-i18n="ways.headless.desc">通过插件协议接入自定义渲染器、WASM 或服务端转换结果，React/Vue/Svelte/原生 JS 共用同一核心。</p>
             <div class="editor-window compact-editor">
               <div class="editor-titlebar"><span></span><span></span><span></span><strong>viewer.ts</strong></div>
               <pre><code>plugins: [pdfPlugin(), officePlugin(), customPlugin()]</code></pre>
@@ -299,7 +308,7 @@
           <article>
             <div class="feature-icon"><svg><use href="#icon-framework"></use></svg></div>
             <h3 data-i18n="feature.two.title">Framework agnostic</h3>
-            <p data-i18n="feature.two.desc">原生 JavaScript、React 和 Vue 使用同一套 core 能力，方便团队跨产品复用。</p>
+            <p data-i18n="feature.two.desc">原生 JavaScript、React、Vue 和 Svelte 使用同一套 core 能力，方便团队跨产品复用。</p>
           </article>
           <article>
             <div class="feature-icon"><svg><use href="#icon-resize"></use></svg></div>
@@ -315,7 +324,7 @@
             <p data-i18n="integration.eyebrow">Drop-in Integration</p>
             <h2 data-i18n="integration.title">Add a viewer in minutes.</h2>
           </div>
-          <p data-i18n="integration.desc">选择 Vanilla JS、React 或 Vue。底层插件一致，UI 可以先用默认组件，再逐步定制。</p>
+          <p data-i18n="integration.desc">选择 Vanilla JS、React、Vue 或 Svelte。底层插件一致，UI 可以先用默认组件，再逐步定制。</p>
         </div>
         <div class="code-frame">
           <div class="editor-window">
@@ -327,6 +336,7 @@
               <button class="active" type="button" data-code-tab="vanilla">Vanilla JS</button>
               <button type="button" data-code-tab="react">React</button>
               <button type="button" data-code-tab="vue">Vue</button>
+              <button type="button" data-code-tab="svelte">Svelte</button>
             </div>
             <p id="frameworkCopy"></p>
             <pre><code id="codeSample"></code></pre>
@@ -357,6 +367,14 @@
             <label>
               <span data-i18n="playground.sample">Built-in sample</span>
               <select id="sample"></select>
+            </label>
+            <label class="url-preview-control">
+              <span data-i18n="playground.urlLabel">File URL</span>
+              <span class="url-preview-row">
+                <input id="fileUrl" type="url" inputmode="url" placeholder="https://example.com/report.pdf" />
+                <button id="previewUrl" type="button" data-i18n="playground.urlAction">Preview URL</button>
+              </span>
+              <small data-i18n="playground.urlHint">Use a public URL with CORS enabled.</small>
             </label>
             <div class="control-grid">
               <label>

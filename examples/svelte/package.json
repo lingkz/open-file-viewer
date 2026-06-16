@@ -1,0 +1,20 @@
+{
+  "name": "@open-file-viewer/example-svelte",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@open-file-viewer/core": "workspace:*",
+    "@open-file-viewer/svelte": "workspace:*",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "pdfjs-dist": "^4.10.38",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

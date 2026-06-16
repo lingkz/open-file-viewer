@@ -1,6 +1,6 @@
 # Open File Viewer
 
-Open File Viewer 是一个面向现代 Web 产品的文件预览 SDK。它把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和代码文件放进同一个可控容器里，并同时支持原生 JavaScript、React 和 Vue。
+Open File Viewer 是一个面向现代 Web 产品的文件预览 SDK。它把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和代码文件放进同一个可控容器里，并同时支持原生 JavaScript、React、Vue 和 Svelte。
 
 <p>
   <a href="https://open-file-viewer-workspace.void.app">官网</a>
@@ -12,12 +12,15 @@ Open File Viewer 是一个面向现代 Web 产品的文件预览 SDK。它把 PD
   <a href="https://www.npmjs.com/package/@open-file-viewer/react">React</a>
   ·
   <a href="https://www.npmjs.com/package/@open-file-viewer/vue">Vue</a>
+  ·
+  <a href="https://www.npmjs.com/package/@open-file-viewer/svelte">Svelte</a>
 </p>
 
 [![GitHub](https://img.shields.io/badge/GitHub-xushanpei%2Fopen--file--viewer-111827?logo=github)](https://github.com/xushanpei/open-file-viewer)
 [![Core](https://img.shields.io/npm/v/@open-file-viewer/core?label=%40open-file-viewer%2Fcore&color=7c5cff)](https://www.npmjs.com/package/@open-file-viewer/core)
 [![React](https://img.shields.io/npm/v/@open-file-viewer/react?label=react&color=149eca)](https://www.npmjs.com/package/@open-file-viewer/react)
 [![Vue](https://img.shields.io/npm/v/@open-file-viewer/vue?label=vue&color=41b883)](https://www.npmjs.com/package/@open-file-viewer/vue)
+[![Svelte](https://img.shields.io/npm/v/@open-file-viewer/svelte?label=svelte&color=ff3e00)](https://www.npmjs.com/package/@open-file-viewer/svelte)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 ## 为什么选择它
@@ -25,7 +28,7 @@ Open File Viewer 是一个面向现代 Web 产品的文件预览 SDK。它把 PD
 多数业务系统都会遇到附件预览：合同、表格、图纸、压缩包、邮件、图片、视频、代码文件。Open File Viewer 的目标不是做一个只能打开 PDF 的 demo，而是提供一套可以长期演进的文件预览基础设施。
 
 - **容器优先**：所有内容渲染在你传入的 DOM 容器内，不跳窗口，不打断业务页面。
-- **三端兼容**：原生 JavaScript、React、Vue 共用同一套 core 能力。
+- **多框架兼容**：原生 JavaScript、React、Vue、Svelte 共用同一套 core 能力。
 - **格式插件化**：不同文件格式由独立插件负责，方便替换、裁剪和扩展。
 - **响应式预览**：支持 `px`、`%`、`vh`、`vw`、`rem`、`calc()` 等 CSS 尺寸，自动响应容器变化。
 - **产品级状态**：内置 loading、error、unsupported、download fallback、工具栏、主题和多文件队列。
@@ -47,6 +50,12 @@ Vue:
 
 ```bash
 pnpm add @open-file-viewer/core @open-file-viewer/vue
+```
+
+Svelte:
+
+```bash
+pnpm add @open-file-viewer/core @open-file-viewer/svelte
 ```
 
 PDF 预览需要安装 `pdfjs-dist`：
@@ -180,13 +189,44 @@ const plugins = [
 </template>
 ```
 
+### Svelte
+
+```svelte
+<script lang="ts">
+  import { OpenFileViewer } from "@open-file-viewer/svelte";
+  import { imagePlugin, pdfPlugin, officePlugin, textPlugin } from "@open-file-viewer/core";
+  import "@open-file-viewer/core/style.css";
+  import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
+
+  export let file: File;
+
+  const plugins = [
+    imagePlugin(),
+    textPlugin(),
+    pdfPlugin({ workerSrc: pdfWorkerSrc }),
+    officePlugin()
+  ];
+</script>
+
+<OpenFileViewer
+  {file}
+  fileName={file.name}
+  width="100%"
+  height="640px"
+  fit="contain"
+  toolbar
+  theme="auto"
+  {plugins}
+/>
+```
+
 ## 适合的场景
 
 | 场景 | Open File Viewer 提供什么 |
 | --- | --- |
 | OA / ERP / CRM 附件中心 | 合同、表格、图片、邮件、压缩包统一容器预览 |
 | 网盘 / 知识库 / 文档系统 | 多文件队列、下载、搜索、全屏、主题适配 |
-| 低代码 / 表单系统 | 原生 JS 接入，不强依赖 React 或 Vue |
+| 低代码 / 表单系统 | 原生 JS 接入，不强依赖 React、Vue 或 Svelte |
 | 工程 / 制造 / GIS 系统 | CAD、3D、GIS、图纸类文件识别和渐进增强 |
 | 开发者平台 / 日志平台 | 文本、配置、Markdown、代码高亮和大文件保护 |
 
@@ -194,7 +234,7 @@ const plugins = [
 
 | 能力 | 状态 |
 | --- | --- |
-| 原生 JS / React / Vue 接入 | 已支持 |
+| 原生 JS / React / Vue / Svelte 接入 | 已支持 |
 | 自定义容器、宽高和响应式尺寸 | 已支持 |
 | 多文件队列、切换、当前索引 | 已支持 |
 | 工具栏、下载、全屏、打印、搜索 | 已支持 |
@@ -398,6 +438,22 @@ createViewer({
 </OpenFileViewer>
 ```
 
+### Svelte 自定义工具栏
+
+```svelte
+<OpenFileViewer files={files} plugins={plugins}>
+  <svelte:fragment slot="toolbar" let:ctx>
+    {#if ctx}
+      <button disabled={!ctx.canPrevious} on:click={() => void ctx.previous()}>上一份</button>
+      <span>{ctx.index + 1} / {ctx.length}</span>
+      <button disabled={!ctx.canNext} on:click={() => void ctx.next()}>下一份</button>
+      <button on:click={ctx.download}>下载</button>
+      <button on:click={() => openApprovalDialog(ctx.file)}>审批</button>
+    {/if}
+  </svelte:fragment>
+</OpenFileViewer>
+```
+
 样式层面仍然可以覆盖 `.ofv-toolbar`、`.ofv-toolbar button`、`.ofv-toolbar-search` 等 class。自定义图标按钮会额外生成 `.ofv-toolbar-icon` 和 `.ofv-toolbar-label`，方便控制对齐、间距和省略。
 
 ### FileViewer
@@ -456,10 +512,12 @@ packages/
   core/      # 框架无关的预览核心和插件
   react/     # React 适配层
   vue/       # Vue 适配层
+  svelte/    # Svelte 适配层
 examples/
   vanilla/   # 原生 JavaScript 示例
   react/     # React 示例
   vue/       # Vue 示例
+  svelte/    # Svelte 示例
 doc/         # 官网和在线体验
 ```
 
@@ -477,6 +535,7 @@ pnpm dev:doc
 pnpm dev:vanilla
 pnpm dev:react
 pnpm dev:vue
+pnpm dev:svelte
 pnpm test
 pnpm typecheck
 pnpm build
@@ -491,7 +550,7 @@ pnpm pack:check
 
 | 版本 | 重点 |
 | --- | --- |
-| `0.1.x` | Core 插件系统、容器内预览、React/Vue/Vanilla 接入、多格式基础预览 |
+| `0.1.x` | Core 插件系统、容器内预览、React/Vue/Svelte/Vanilla 接入、多格式基础预览 |
 | `0.2.x` | 工具栏、主题、图片交互、PDF 搜索、统一状态和 fallback |
 | `0.3.x` | Markdown/代码阅读器、Office 表格和文档体验增强 |
 | `0.4.x` | OFD、邮件、压缩包、绘图和国内业务高频格式增强 |
@@ -505,6 +564,7 @@ pnpm pack:check
 - NPM Core：https://www.npmjs.com/package/@open-file-viewer/core
 - NPM React：https://www.npmjs.com/package/@open-file-viewer/react
 - NPM Vue：https://www.npmjs.com/package/@open-file-viewer/vue
+- NPM Svelte：https://www.npmjs.com/package/@open-file-viewer/svelte
 
 ## License
 

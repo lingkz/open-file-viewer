@@ -1,0 +1,48 @@
+{
+  "name": "@open-file-viewer/svelte",
+  "version": "0.1.2",
+  "description": "Svelte adapter for Open File Viewer.",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://open-file-viewer-workspace.void.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xushanpei/open-file-viewer.git",
+    "directory": "packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/xushanpei/open-file-viewer/issues"
+  },
+  "svelte": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "svelte": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "svelte-package -i src -o dist",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "peerDependencies": {
+    "@open-file-viewer/core": "0.1.2",
+    "svelte": ">=4"
+  },
+  "devDependencies": {
+    "@open-file-viewer/core": "workspace:*",
+    "@sveltejs/package": "^2.3.10",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "^5.7.2"
+  }
+}

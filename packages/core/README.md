@@ -90,11 +90,12 @@ Import the stylesheet once in your app:
 import "@open-file-viewer/core/style.css";
 ```
 
-React and Vue adapters are available as separate packages:
+React, Vue and Svelte adapters are available as separate packages:
 
 ```bash
 npm install @open-file-viewer/react
 npm install @open-file-viewer/vue
+npm install @open-file-viewer/svelte
 ```
 
 ## Toolbar Customization
