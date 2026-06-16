@@ -169,7 +169,7 @@ describe("createViewer", () => {
           download: "下载文件"
         },
         icons: {
-          download: "<svg data-icon=\"download\"></svg>"
+          download: "<svg data-icon=\"download\" viewBox=\"0 0 24 24\"><path d=\"M12 3v12\" /></svg>"
         },
         order: ["download", "approve", "zoom-in"],
         actions: [
@@ -201,12 +201,62 @@ describe("createViewer", () => {
     expect(buttons.map((button) => button.textContent)).toEqual(["下载", "审批", "放大"]);
     expect(buttons[0].getAttribute("aria-label")).toBe("下载文件");
     expect(buttons[0].querySelector("[data-icon='download']")).not.toBeNull();
+    expect(buttons[0].querySelector("path")?.getAttribute("d")).toBe("M12 3v12");
 
     buttons[1].click();
     expect(approve).toHaveBeenCalledWith("hello.txt");
 
     buttons[2].click();
     expect(command).toHaveBeenCalledWith("zoom-in");
+
+    viewer.destroy();
+  });
+
+  it("sanitizes toolbar icon strings before rendering them", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["hello"], { type: "text/plain" }),
+      fileName: "hello.txt",
+      toolbar: {
+        zoom: false,
+        rotate: false,
+        fullscreen: false,
+        print: false,
+        search: false,
+        icons: {
+          download:
+            '<svg data-icon="download" viewBox="0 0 24 24" onload="alert(1)"><script>alert(1)</script><foreignObject><button>bad</button></foreignObject><path d="M12 3v12" onclick="alert(2)" style="background:url(javascript:alert(3))" href="javascript:alert(4)" /></svg>'
+        },
+        order: ["download"]
+      },
+      plugins: [
+        {
+          name: "safe-icon",
+          match: () => true,
+          render(ctx) {
+            ctx.viewport.textContent = ctx.file.name;
+            return { destroy: vi.fn() };
+          }
+        }
+      ]
+    });
+
+    await waitFor(() => container.textContent?.includes("hello.txt") === true);
+
+    const icon = container.querySelector(".ofv-toolbar-icon");
+    const svg = icon?.querySelector("svg");
+    const path = icon?.querySelector("path");
+    expect(svg).not.toBeNull();
+    expect(path?.getAttribute("d")).toBe("M12 3v12");
+    expect(icon?.querySelector("script")).toBeNull();
+    expect(icon?.querySelector("foreignObject")).toBeNull();
+    expect(svg?.getAttribute("onload")).toBeNull();
+    expect(path?.getAttribute("onclick")).toBeNull();
+    expect(path?.getAttribute("style")).toBeNull();
+    expect(path?.getAttribute("href")).toBeNull();
 
     viewer.destroy();
   });

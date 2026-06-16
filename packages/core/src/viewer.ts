@@ -794,7 +794,7 @@ function setToolbarButtonContent(
   iconElement.className = "ofv-toolbar-icon";
   iconElement.setAttribute("aria-hidden", "true");
   if (typeof icon === "string") {
-    iconElement.innerHTML = icon;
+    iconElement.append(sanitizeToolbarIcon(icon));
   } else {
     iconElement.append(icon.cloneNode(true));
   }
@@ -803,6 +803,106 @@ function setToolbarButtonContent(
   labelElement.className = "ofv-toolbar-label";
   labelElement.textContent = label;
   button.append(iconElement, labelElement);
+}
+
+const allowedToolbarIconTags = new Set([
+  "svg",
+  "g",
+  "path",
+  "circle",
+  "rect",
+  "line",
+  "polyline",
+  "polygon",
+  "ellipse",
+  "defs",
+  "title",
+  "desc"
+]);
+
+const allowedToolbarIconAttrs = new Set([
+  "aria-hidden",
+  "class",
+  "cx",
+  "cy",
+  "d",
+  "fill",
+  "focusable",
+  "height",
+  "id",
+  "points",
+  "r",
+  "rx",
+  "ry",
+  "stroke",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "stroke-width",
+  "transform",
+  "viewBox",
+  "width",
+  "x",
+  "x1",
+  "x2",
+  "y",
+  "y1",
+  "y2"
+]);
+
+function sanitizeToolbarIcon(icon: string): Node {
+  const template = document.createElement("template");
+  template.innerHTML = icon.trim();
+  const fragment = document.createDocumentFragment();
+  for (const child of Array.from(template.content.childNodes)) {
+    const sanitized = sanitizeToolbarIconNode(child);
+    if (sanitized) {
+      fragment.append(sanitized);
+    }
+  }
+  return fragment;
+}
+
+function sanitizeToolbarIconNode(node: Node): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent || "";
+    return text.trim() ? document.createTextNode(text) : null;
+  }
+
+  if (!(node instanceof Element)) {
+    return null;
+  }
+
+  const tagName = node.tagName.toLowerCase();
+  if (!allowedToolbarIconTags.has(tagName)) {
+    return null;
+  }
+
+  const sanitized = document.createElementNS("http://www.w3.org/2000/svg", tagName);
+  for (const attr of Array.from(node.attributes)) {
+    if (isSafeToolbarIconAttribute(attr.name, attr.value)) {
+      sanitized.setAttribute(attr.name, attr.value);
+    }
+  }
+
+  for (const child of Array.from(node.childNodes)) {
+    const sanitizedChild = sanitizeToolbarIconNode(child);
+    if (sanitizedChild) {
+      sanitized.append(sanitizedChild);
+    }
+  }
+
+  return sanitized;
+}
+
+function isSafeToolbarIconAttribute(name: string, value: string): boolean {
+  const attrName = name.toLowerCase();
+  if (attrName.startsWith("on") || attrName.includes(":")) {
+    return false;
+  }
+  if (!allowedToolbarIconAttrs.has(name) && !allowedToolbarIconAttrs.has(attrName) && !attrName.startsWith("data-")) {
+    return false;
+  }
+  return !/^\s*(?:javascript|data:text\/html|vbscript):/i.test(value);
 }
 
 function isBuiltInToolbarAction(id: PreviewToolbarActionId): id is PreviewToolbarBuiltInAction {
