@@ -1132,7 +1132,7 @@ function applyLanguage(nextLanguage: Language) {
       element.textContent = translations[language][key];
     }
   }
-  languageToggle.textContent = language === "zh" ? "EN" : "中文";
+  languageToggle.textContent = language === "zh" ? "EN" : "ZH";
   writeStorage("ofv-language", language);
   populateSamples();
   populateFormats();
