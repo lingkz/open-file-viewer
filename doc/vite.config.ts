@@ -3,7 +3,13 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
-    chunkSizeWarningLimit: 2500
+    chunkSizeWarningLimit: 2500,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        api: fileURLToPath(new URL("./api.html", import.meta.url))
+      }
+    }
   },
   resolve: {
     alias: {

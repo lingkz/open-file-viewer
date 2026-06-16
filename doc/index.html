@@ -171,7 +171,7 @@
         <a href="#docs"><svg><use href="#icon-docs"></use></svg><span data-i18n="nav.docs">文档</span></a>
         <a href="#frameworks"><svg><use href="#icon-framework"></use></svg><span data-i18n="nav.frameworks">框架</span></a>
         <a href="#formats"><svg><use href="#icon-grid"></use></svg><span data-i18n="nav.formats">格式</span></a>
-        <a href="#api"><svg><use href="#icon-api"></use></svg><span data-i18n="nav.api">API</span></a>
+        <a href="/api.html"><svg><use href="#icon-api"></use></svg><span data-i18n="nav.api">API</span></a>
         <a href="#playground"><svg><use href="#icon-play"></use></svg><span data-i18n="nav.playground">在线使用</span></a>
       </nav>
       <div class="nav-actions">
@@ -189,7 +189,7 @@
           一个兼容原生 JavaScript、React、Vue 和 Svelte 的嵌入式文件预览器。把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和工程文件放进同一个稳定容器。
         </p>
         <div class="hero-actions">
-          <a class="primary-button" href="#docs"><span data-i18n="hero.primary">Get Started</span><svg><use href="#icon-arrow"></use></svg></a>
+          <a class="primary-button" href="/api.html"><span data-i18n="hero.primary">Get Started</span><svg><use href="#icon-arrow"></use></svg></a>
           <a class="secondary-button" href="#playground"><svg><use href="#icon-eye"></use></svg><span data-i18n="hero.secondary">Live Demo</span></a>
           <a class="secondary-button" href="#formats"><svg><use href="#icon-grid"></use></svg><span data-i18n="hero.tertiary">Formats</span></a>
         </div>
@@ -435,28 +435,28 @@
           </div>
           <p data-i18n="api.desc">核心 API 保持克制：容器、文件、插件、尺寸、主题和事件回调。复杂格式能力由插件扩展。</p>
         </div>
-        <div class="api-layout">
-          <article>
-            <h3>PreviewOptions</h3>
-            <div class="api-table" id="apiOptions"></div>
-          </article>
-          <article>
-            <h3>Plugin Protocol</h3>
-            <div class="editor-window">
-              <div class="editor-titlebar"><span></span><span></span><span></span><strong>custom-plugin.ts</strong></div>
-              <pre><code id="pluginCode"></code></pre>
-            </div>
-          </article>
-          <article>
-            <h3 data-i18n="toolbar.title">Toolbar Customization</h3>
-            <p class="api-note" data-i18n="toolbar.desc">Change labels, order, icons, business actions or replace the toolbar completely.</p>
-            <div class="editor-window">
-              <div class="editor-titlebar"><span></span><span></span><span></span><strong>toolbar.ts</strong></div>
-              <pre><code id="toolbarCode"></code></pre>
-            </div>
-          </article>
+        <div class="api-summary-grid">
+          <a class="api-summary-card" href="/api.html#frameworks">
+            <span><svg><use href="#icon-framework"></use></svg></span>
+            <strong>Frameworks</strong>
+            <p>Vanilla JS、React、Vue、Svelte 的安装、接入方式和差异说明。</p>
+          </a>
+          <a class="api-summary-card" href="/api.html#options">
+            <span><svg><use href="#icon-api"></use></svg></span>
+            <strong>PreviewOptions</strong>
+            <p>文件源、队列、尺寸、主题、回调、降级和实例方法完整说明。</p>
+          </a>
+          <a class="api-summary-card" href="/api.html#toolbar">
+            <span><svg><use href="#icon-puzzle"></use></svg></span>
+            <strong data-i18n="toolbar.title">Toolbar Customization</strong>
+            <p data-i18n="toolbar.desc">支持自定义文案、顺序、图标、审批/收藏/分享等业务按钮，也可以完全替换工具栏。</p>
+          </a>
+          <a class="api-summary-card" href="/api.html#plugins">
+            <span><svg><use href="#icon-layers"></use></svg></span>
+            <strong>Plugin Protocol</strong>
+            <p>通过 match/render 协议扩展自定义格式、服务端转换结果或业务专属渲染器。</p>
+          </a>
         </div>
-        <div hidden id="instanceApi"></div>
       </section>
 
       <section class="cta-band">

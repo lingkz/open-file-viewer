@@ -46,12 +46,6 @@ type ZipEntry = {
   content: string | Uint8Array;
 };
 
-interface ApiRow {
-  name: string;
-  type: string;
-  description: Record<Language, string>;
-}
-
 const translations: Record<Language, Record<string, string>> = {
   zh: {
     "nav.docs": "文档",
@@ -175,27 +169,13 @@ const translations: Record<Language, Record<string, string>> = {
   }
 };
 
-const apiOptions: ApiRow[] = [
-  { name: "container", type: "HTMLElement | string", description: { zh: "必填。预览挂载容器。", en: "Required. The container where the preview is mounted." } },
-  { name: "file", type: "PreviewSource", description: { zh: "单文件预览源，支持 File、Blob、URL、ArrayBuffer。", en: "Single preview source: File, Blob, URL or ArrayBuffer." } },
-  { name: "files", type: "(PreviewSource | PreviewItem)[]", description: { zh: "多文件预览队列，可配合工具栏切换。", en: "Multi-file queue, usable with toolbar navigation." } },
-  { name: "plugins", type: "PreviewPlugin[]", description: { zh: "内置插件或自定义插件列表。", en: "Built-in or custom plugin list." } },
-  { name: "fit", type: "PreviewFit", description: { zh: "内容适配策略：contain、cover、width、height、actual、scale-down。", en: "Content fit mode: contain, cover, width, height, actual or scale-down." } },
-  { name: "toolbar", type: "boolean | PreviewToolbarOptions", description: { zh: "工具栏配置。支持开关、文案、顺序、图标、业务按钮和完全自定义渲染。", en: "Toolbar configuration with toggles, labels, order, icons, custom actions and full rendering." } },
-  { name: "renderToolbar", type: "React prop", description: { zh: "React 适配器的自定义工具栏 render prop。", en: "Custom toolbar render prop for the React adapter." } },
-  { name: "#toolbar", type: "Vue slot", description: { zh: "Vue 适配器的自定义工具栏插槽。", en: "Custom toolbar slot for the Vue adapter." } },
-  { name: "slot=\"toolbar\"", type: "Svelte slot", description: { zh: "Svelte 适配器的自定义工具栏插槽。", en: "Custom toolbar slot for the Svelte adapter." } },
-  { name: "theme", type: "light | dark | auto", description: { zh: "预览器主题。", en: "Viewer theme." } },
-  { name: "onLoad / onError", type: "callback", description: { zh: "加载完成和错误回调。", en: "Lifecycle callbacks for load and error states." } }
-];
-
 const formats = [
-  { title: "PDF / Office", icon: "icon-file", level: { zh: "高频业务文档", en: "Business documents" }, items: "pdf docx docm doc dotx dotm rtf odt xlsx xls xlsm ods pptx pptm ppt odp ofd epub xps" },
-  { title: "Image / Media", icon: "icon-image", level: { zh: "浏览器原生与增强", en: "Native and enhanced" }, items: "jpg jpeg png gif webp avif jxl svg bmp ico heic heif mp4 webm m3u8 mp3 wav flac midi" },
-  { title: "Text / Code", icon: "icon-code", level: { zh: "高亮与编辑器模式", en: "Highlight and editor mode" }, items: "txt md json jsonc json5 ipynb yaml toml ini proto hcl tex gv http js ts vue react css html py go rs rb swift kt" },
-  { title: "Engineering", icon: "icon-cube", level: { zh: "工程资料与结构预览", en: "Engineering and structure" }, items: "dxf dwg step ifc gltf glb obj stl fbx dae 3mf usdz geojson kml kmz gpx shp drawio excalidraw" },
-  { title: "Archive / Email", icon: "icon-archive", level: { zh: "目录、正文与附件", en: "Structure, body and attachments" }, items: "zip rar 7z tar gz tgz bz2 xz eml msg mbox" },
-  { title: "Assets / Data", icon: "icon-database", level: { zh: "结构解析与安全摘要", en: "Structure parsing and safe summaries" }, items: "ttf otf woff woff2 psd ai eps sqlite wasm parquet avro webarchive" }
+  { title: "PDF / Office", icon: "document", level: { zh: "高频业务文档", en: "Business documents" }, items: "pdf docx docm dotx dotm rtf odt xlsx xlsm ods pptx pptm odp ofd epub xps" },
+  { title: "Image / Media", icon: "media", level: { zh: "浏览器原生与增强", en: "Native and enhanced" }, items: "jpg jpeg png gif webp avif jxl svg bmp ico heic heif mp4 webm m3u8 mp3 wav flac midi" },
+  { title: "Text / Code", icon: "code", level: { zh: "高亮与编辑器模式", en: "Highlight and editor mode" }, items: "txt md json jsonc json5 ipynb yaml toml ini proto hcl tex gv http js ts vue react css html py go rs rb swift kt" },
+  { title: "Engineering", icon: "engineering", level: { zh: "工程资料与结构预览", en: "Engineering and structure" }, items: "dxf dwg step ifc gltf glb obj stl fbx dae 3mf usdz geojson kml kmz gpx shp drawio excalidraw" },
+  { title: "Archive / Email", icon: "archive", level: { zh: "目录、正文与附件", en: "Structure, body and attachments" }, items: "zip rar 7z tar gz tgz bz2 xz eml msg mbox" },
+  { title: "Assets / Data", icon: "data", level: { zh: "结构解析与安全摘要", en: "Structure parsing and safe summaries" }, items: "ttf otf woff woff2 psd ai eps sqlite wasm parquet avro webarchive" }
 ];
 
 const frameworkCopy: Record<CodeTab, Record<Language, string>> = {
@@ -266,57 +246,6 @@ const codeLanguages: Record<CodeTab, string> = {
   vue: "markup",
   svelte: "markup"
 };
-
-const pluginCode = `import type { PreviewPlugin } from "@open-file-viewer/core";
-
-export function customPlugin(): PreviewPlugin {
-  return {
-    name: "custom",
-    match(file) {
-      return file.extension === "custom";
-    },
-    render(ctx) {
-      const element = document.createElement("div");
-      element.textContent = ctx.file.name;
-      ctx.viewport.append(element);
-
-      return {
-        resize(size) {
-          console.log("container resized", size);
-        },
-        destroy() {
-          element.remove();
-        }
-      };
-    }
-  };
-}`;
-
-const toolbarCode = `createViewer({
-  container: "#viewer",
-  file,
-  toolbar: {
-    labels: {
-      download: "下载",
-      fullscreen: "全屏",
-      search: "搜索"
-    },
-    icons: {
-      download: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>'
-    },
-    order: ["search", "download", "favorite", "approve", "share", "fullscreen"],
-    actions: [
-      { id: "favorite", label: "收藏", onClick: (ctx) => favoriteFile(ctx.file) },
-      { id: "approve", label: "审批", onClick: (ctx) => openApprovalDialog(ctx.file) },
-      { id: "share", label: "分享", onClick: (ctx) => shareFile(ctx.file) }
-    ]
-  },
-  plugins
-});
-
-// React: <FileViewer renderToolbar={(ctx) => <button onClick={ctx.download}>下载</button>} />
-// Vue: <template #toolbar="ctx"><button @click="ctx.download()">下载</button></template>
-// Svelte: <button slot="toolbar" let:ctx on:click={ctx.download}>下载</button>`;
 
 const demoFiles: DemoFile[] = [
   {
@@ -1052,10 +981,7 @@ const filePickerName = requiredElement<HTMLElement>("#filePickerName");
 const languageToggle = requiredElement<HTMLButtonElement>("#languageToggle");
 const themeToggle = requiredElement<HTMLButtonElement>("#themeToggle");
 const codeSample = requiredElement<HTMLElement>("#codeSample");
-const pluginCodeElement = requiredElement<HTMLElement>("#pluginCode");
-const toolbarCodeElement = requiredElement<HTMLElement>("#toolbarCode");
 const formatGrid = requiredElement<HTMLElement>("#formatGrid");
-const apiOptionsElement = requiredElement<HTMLElement>("#apiOptions");
 const frameworkCopyElement = requiredElement<HTMLElement>("#frameworkCopy");
 const desktopViewerHeight = "680px";
 const tabletViewerHeight = "min(560px, 62vh)";
@@ -1171,7 +1097,6 @@ function applyLanguage(nextLanguage: Language) {
   languageToggle.textContent = language === "zh" ? "EN" : "中文";
   writeStorage("ofv-language", language);
   populateSamples();
-  populateApiTable();
   populateFormats();
   updateFilePickerLabel();
   setCodeSample(activeCodeTab);
@@ -1185,39 +1110,13 @@ function applySiteTheme(nextTheme: SiteTheme) {
   writeStorage("ofv-site-theme", siteTheme);
 }
 
-function populateApiTable() {
-  apiOptionsElement.replaceChildren(
-    ...apiOptions.map((row, index) => {
-      const item = document.createElement("div");
-      item.className = "api-row";
-      const icon = document.createElement("span");
-      icon.className = "api-icon";
-      icon.innerHTML = iconSvg(index === 0 ? "icon-resize" : index === 3 ? "icon-puzzle" : index === 5 ? "icon-eye" : "icon-api");
-      const main = document.createElement("div");
-      main.className = "api-main";
-      const header = document.createElement("div");
-      header.className = "api-row-header";
-      const name = document.createElement("strong");
-      name.textContent = row.name;
-      const type = document.createElement("code");
-      type.textContent = row.type;
-      const desc = document.createElement("span");
-      desc.textContent = row.description[language];
-      header.append(name, type);
-      main.append(header, desc);
-      item.append(icon, main);
-      return item;
-    })
-  );
-}
-
 function populateFormats() {
   formatGrid.replaceChildren(
     ...formats.map((format) => {
       const card = document.createElement("article");
       const icon = document.createElement("div");
-      icon.className = "format-icon";
-      icon.innerHTML = iconSvg(format.icon);
+      icon.className = `format-icon format-icon-${format.icon}`;
+      icon.innerHTML = formatIconSvg(format.icon);
       const title = document.createElement("h3");
       title.textContent = format.title;
       const level = document.createElement("p");
@@ -1237,6 +1136,47 @@ function populateFormats() {
 
 function iconSvg(id: string): string {
   return `<svg aria-hidden="true" focusable="false"><use href="#${id}"></use></svg>`;
+}
+
+function formatIconSvg(kind: string): string {
+  const icons: Record<string, string> = {
+    document: `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path class="format-icon-fill" d="M9 4h10l5 5v19H9V4Z"></path>
+      <path class="format-icon-cut" d="M19 4v6h5"></path>
+      <path class="format-icon-mark" d="M12 15h9M12 19h7M12 23h10"></path>
+    </svg>`,
+    media: `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path class="format-icon-fill" d="M6 8h20v16H6V8Z"></path>
+      <circle class="format-icon-cut" cx="21.5" cy="12.5" r="2.1"></circle>
+      <path class="format-icon-mark" d="m7 23 6.5-7 4.8 5.1 2.7-3.1 5 5"></path>
+      <path class="format-icon-accent" d="M12 27h8"></path>
+    </svg>`,
+    code: `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path class="format-icon-fill" d="M8 7h16v18H8V7Z"></path>
+      <path class="format-icon-mark" d="m13 12-4 4 4 4M19 12l4 4-4 4"></path>
+      <path class="format-icon-accent" d="m17 10-2 12"></path>
+    </svg>`,
+    engineering: `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path class="format-icon-fill" d="m16 4 10 5.6v12.8L16 28 6 22.4V9.6L16 4Z"></path>
+      <path class="format-icon-cut" d="m6.6 9.9 9.4 5.3 9.4-5.3"></path>
+      <path class="format-icon-mark" d="M16 15.2V28"></path>
+      <path class="format-icon-accent" d="m10.7 19 5.3 3 5.3-3"></path>
+    </svg>`,
+    archive: `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path class="format-icon-fill" d="M7 9h18v17H7V9Z"></path>
+      <path class="format-icon-cut" d="M9 5h14l2 4H7l2-4Z"></path>
+      <path class="format-icon-mark" d="M13 14h6M13 18h6M13 22h4"></path>
+      <path class="format-icon-accent" d="M22 15v8"></path>
+    </svg>`,
+    data: `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path class="format-icon-fill" d="M7 9c0-3 18-3 18 0v14c0 3-18 3-18 0V9Z"></path>
+      <path class="format-icon-cut" d="M7 9c0 3 18 3 18 0"></path>
+      <path class="format-icon-mark" d="M7 16c0 3 18 3 18 0M7 23c0 3 18 3 18 0"></path>
+      <path class="format-icon-accent" d="M12 12v4M20 18v4"></path>
+    </svg>`
+  };
+
+  return icons[kind] || iconSvg("icon-file");
 }
 
 function populateSamples() {
@@ -1273,7 +1213,7 @@ function setHighlightedCode(element: HTMLElement, source: string, languageName: 
 }
 
 function highlightStaticCodeBlocks() {
-  for (const code of document.querySelectorAll<HTMLElement>("pre code:not(#codeSample):not(#pluginCode):not(#toolbarCode)")) {
+  for (const code of document.querySelectorAll<HTMLElement>("pre code:not(#codeSample)")) {
     const text = code.textContent || "";
     const languageName = text.trim().startsWith("npm ") ? "bash" : "typescript";
     setHighlightedCode(code, text, languageName);
@@ -1404,8 +1344,6 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-code-ta
 
 applySiteTheme(siteTheme);
 applyLanguage(language);
-setHighlightedCode(pluginCodeElement, pluginCode, "typescript");
-setHighlightedCode(toolbarCodeElement, toolbarCode, "typescript");
 highlightStaticCodeBlocks();
 syncNavigationState();
 updateFilePickerLabel();
