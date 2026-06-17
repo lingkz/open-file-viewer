@@ -15,7 +15,16 @@ const renderDocxAsync = vi.hoisted(() =>
     const page = document.createElement("section");
     page.className = "ofv-docx";
     page.style.width = "794px";
-    page.textContent = "DOCX layout page";
+    const compactParagraph = document.createElement("p");
+    compactParagraph.style.lineHeight = "0.06";
+    compactParagraph.textContent = "DOCX compact paragraph";
+    const percentParagraph = document.createElement("p");
+    percentParagraph.style.lineHeight = "50%";
+    percentParagraph.textContent = "DOCX percent paragraph";
+    const normalParagraph = document.createElement("p");
+    normalParagraph.style.lineHeight = "1.5";
+    normalParagraph.textContent = "DOCX layout page";
+    page.append(compactParagraph, percentParagraph, normalParagraph);
     wrapper.append(page);
     bodyContainer.append(wrapper);
   })
@@ -326,6 +335,27 @@ describe("officePlugin", () => {
       renderFooters: true
     });
     expect(container.querySelector(".ofv-docx-document")?.textContent).toContain("DOCX layout page");
+  });
+
+  it("normalizes impossible DOCX line heights that would overlap text", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob(["docx"], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      }),
+      fileName: "compressed-line-height.docx",
+      plugins: [officePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-docx-document")));
+    const paragraphs = Array.from(container.querySelectorAll<HTMLParagraphElement>("section.ofv-docx p"));
+
+    expect(paragraphs[0]?.style.lineHeight).toBe("1.2");
+    expect(paragraphs[1]?.style.lineHeight).toBe("1.2");
+    expect(paragraphs[2]?.style.lineHeight).toBe("1.5");
   });
 
   it("keeps DOCX page width stable inside narrow containers", async () => {

@@ -189,6 +189,7 @@ async function renderDocx(panel: HTMLElement, arrayBuffer: ArrayBuffer): Promise
       experimental: true,
       useBase64URL: true
     });
+    normalizeDocxLayout(content);
     return fitDocxPages(content);
   } catch (error) {
     content.replaceChildren();
@@ -205,6 +206,31 @@ async function renderDocx(panel: HTMLElement, arrayBuffer: ArrayBuffer): Promise
     console.warn("DOCX layout preview failed, fell back to Mammoth:", error);
   }
   return () => undefined;
+}
+
+function normalizeDocxLayout(container: HTMLElement): void {
+  const pages = container.querySelectorAll<HTMLElement>("section.ofv-docx");
+  for (const page of pages) {
+    for (const element of page.querySelectorAll<HTMLElement>("[style*='line-height']")) {
+      const lineHeight = parseCssLineHeight(element.style.lineHeight);
+      if (lineHeight > 0 && lineHeight < 1) {
+        element.style.lineHeight = "1.2";
+      }
+    }
+  }
+}
+
+function parseCssLineHeight(value: string): number {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "normal") {
+    return 0;
+  }
+  if (trimmed.endsWith("%")) {
+    const parsedPercent = Number.parseFloat(trimmed);
+    return Number.isFinite(parsedPercent) ? parsedPercent / 100 : 0;
+  }
+  const parsed = Number.parseFloat(trimmed);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function fitDocxPages(container: HTMLElement): () => void {
