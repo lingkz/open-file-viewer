@@ -1,5 +1,11 @@
 # Open File Viewer
 
+<p align="right">
+  <strong>简体中文</strong>
+  ·
+  <a href="./README.en.md">English</a>
+</p>
+
 Open File Viewer 是一个面向现代 Web 产品的文件预览 SDK。它把 PDF、Office、图片、音视频、压缩包、邮件、图纸、3D、GIS 和代码文件放进同一个可控容器里，并同时支持原生 JavaScript、React、Vue 和 Svelte。
 
 <p>
