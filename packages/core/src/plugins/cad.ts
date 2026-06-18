@@ -1,3 +1,4 @@
+import pako from "pako";
 import type { PreviewContext, PreviewPlugin } from "../types";
 import { createPanel, createSection, readArrayBuffer, readTextFile, resolveFormat } from "./utils";
 
@@ -22,7 +23,10 @@ const cadExtensions = new Set([
   "3dm",
   "skp",
   "sldprt",
-  "sldasm"
+  "sldasm",
+  "gds",
+  "oas",
+  "oasis"
 ]);
 const cadMimeTypes = new Set([
   "application/acad",
@@ -39,7 +43,11 @@ const cadMimeTypes = new Set([
   "application/x-parasolid",
   "model/vnd.3dm",
   "application/vnd.sketchup.skp",
-  "application/sldworks"
+  "application/sldworks",
+  "application/vnd.gds",
+  "application/x-gdsii",
+  "application/vnd.oasis.layout",
+  "application/x-oasis-layout"
 ]);
 const cadMimeFormatMap: Record<string, string> = {
   "application/acad": "dwg",
@@ -56,7 +64,11 @@ const cadMimeFormatMap: Record<string, string> = {
   "application/x-parasolid": "x_t",
   "model/vnd.3dm": "3dm",
   "application/vnd.sketchup.skp": "skp",
-  "application/sldworks": "sldprt"
+  "application/sldworks": "sldprt",
+  "application/vnd.gds": "gds",
+  "application/x-gdsii": "gds",
+  "application/vnd.oasis.layout": "oas",
+  "application/x-oasis-layout": "oas"
 };
 
 export function cadPlugin(): PreviewPlugin {
@@ -85,6 +97,36 @@ export function cadPlugin(): PreviewPlugin {
       if (extension === "dwg" || extension === "dwf") {
         renderBinaryCad(panel, await readArrayBuffer(ctx.file), extension, ctx.file.name);
         return { destroy: () => panel.remove() };
+      }
+      if (extension === "gds") {
+        const viewer = renderLayoutPreview(panel, parseGdsLayout(new Uint8Array(await readArrayBuffer(ctx.file)), ctx.file.name), ctx);
+        return {
+          canCommand(command) {
+            return viewer.canCommand(command);
+          },
+          command(command) {
+            return viewer.command(command);
+          },
+          destroy() {
+            viewer.destroy();
+            panel.remove();
+          }
+        };
+      }
+      if (extension === "oas" || extension === "oasis") {
+        const viewer = renderLayoutPreview(panel, parseOasisLayout(new Uint8Array(await readArrayBuffer(ctx.file)), ctx.file.name), ctx);
+        return {
+          canCommand(command) {
+            return viewer.canCommand(command);
+          },
+          command(command) {
+            return viewer.command(command);
+          },
+          destroy() {
+            viewer.destroy();
+            panel.remove();
+          }
+        };
       }
       if (extension !== "dxf") {
         const section = createSection("CAD 基础预览");
@@ -206,6 +248,658 @@ type IgesRecord = {
   type: string;
   params: string[];
 };
+
+type LayoutPoint = [number, number];
+
+type LayoutShape = {
+  kind: "boundary" | "path" | "box";
+  layer: string;
+  datatype?: string;
+  points: LayoutPoint[];
+  width?: number;
+};
+
+type LayoutLabel = {
+  layer: string;
+  text: string;
+  x: number;
+  y: number;
+};
+
+type LayoutReference = {
+  cell: string;
+  x: number;
+  y: number;
+};
+
+type LayoutPreviewData = {
+  format: "GDSII" | "OASIS";
+  fileName: string;
+  libraryName?: string;
+  version?: string;
+  unit?: string;
+  cells: string[];
+  shapes: LayoutShape[];
+  labels: LayoutLabel[];
+  references: LayoutReference[];
+  layers: Map<string, number>;
+  metadata: Array<[string, string | number]>;
+  notes: string[];
+  warnings: string[];
+};
+
+type LayoutBounds = {
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+  stroke: number;
+};
+
+const layoutPalette = [
+  "#2563eb",
+  "#dc2626",
+  "#059669",
+  "#7c3aed",
+  "#d97706",
+  "#0891b2",
+  "#be123c",
+  "#4f46e5",
+  "#15803d",
+  "#a16207"
+];
+
+const gdsRecordNames: Record<number, string> = {
+  0x00: "HEADER",
+  0x01: "BGNLIB",
+  0x02: "LIBNAME",
+  0x03: "UNITS",
+  0x04: "ENDLIB",
+  0x05: "BGNSTR",
+  0x06: "STRNAME",
+  0x07: "ENDSTR",
+  0x08: "BOUNDARY",
+  0x09: "PATH",
+  0x0a: "SREF",
+  0x0b: "AREF",
+  0x0c: "TEXT",
+  0x0d: "LAYER",
+  0x0e: "DATATYPE",
+  0x0f: "WIDTH",
+  0x10: "XY",
+  0x11: "ENDEL",
+  0x12: "SNAME",
+  0x16: "TEXTTYPE",
+  0x19: "STRING",
+  0x2d: "BOX"
+};
+
+const oasisRecordNames: Record<number, string> = {
+  0: "PAD",
+  1: "START",
+  2: "END",
+  3: "CELLNAME",
+  4: "CELLNAME-REF",
+  5: "TEXTSTRING",
+  6: "TEXTSTRING-REF",
+  7: "PROPNAME",
+  8: "PROPNAME-REF",
+  9: "PROPSTRING",
+  10: "PROPSTRING-REF",
+  11: "LAYERNAME",
+  12: "LAYERNAME-REF",
+  13: "CELL",
+  14: "XYABSOLUTE",
+  15: "XYRELATIVE",
+  16: "PLACEMENT",
+  17: "PLACEMENT",
+  18: "TEXT",
+  19: "RECTANGLE",
+  20: "POLYGON",
+  21: "PATH",
+  22: "TRAPEZOID",
+  23: "TRAPEZOID",
+  24: "TRAPEZOID",
+  25: "CTRAPEZOID",
+  26: "CIRCLE",
+  27: "PROPERTY",
+  28: "PROPERTY",
+  29: "XNAME",
+  30: "XNAME-REF",
+  31: "XELEMENT",
+  32: "XGEOMETRY",
+  33: "CBLOCK"
+};
+
+function renderLayoutPreview(
+  panel: HTMLElement,
+  data: LayoutPreviewData,
+  ctx: Pick<PreviewContext, "toolbar">
+): {
+  canCommand: (command: string) => boolean;
+  command: (command: string) => boolean;
+  destroy: () => void;
+} {
+  const section = createSection(`${data.format} 版图预览`);
+  const summary = document.createElement("div");
+  summary.className = "ofv-cad-summary ofv-layout-summary";
+  appendMeta(summary, "文件", data.fileName);
+  appendMeta(summary, "格式", data.format);
+  if (data.libraryName) {
+    appendMeta(summary, "库", data.libraryName);
+  }
+  if (data.version) {
+    appendMeta(summary, "版本", data.version);
+  }
+  if (data.unit) {
+    appendMeta(summary, "单位", data.unit);
+  }
+  appendMeta(summary, "Cell", data.cells.length);
+  appendMeta(summary, "几何", data.shapes.length);
+  appendMeta(summary, "引用", data.references.length);
+  appendMeta(summary, "文字", data.labels.length);
+  for (const [label, value] of data.metadata) {
+    appendMeta(summary, label, value);
+  }
+  section.append(summary);
+
+  for (const noteText of [...data.notes, ...data.warnings]) {
+    const note = document.createElement("p");
+    note.className = data.warnings.includes(noteText) ? "ofv-layout-warning" : "ofv-layout-note";
+    note.textContent = noteText;
+    section.append(note);
+  }
+
+  const bounds = computeLayoutBounds(data.shapes, data.labels, data.references);
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "ofv-svg-stage ofv-layout-stage");
+  let currentViewBox = { x: bounds.minX, y: bounds.minY, width: bounds.width, height: bounds.height };
+  const initialViewBox = { ...currentViewBox };
+  const applyViewBox = () => {
+    svg.setAttribute("viewBox", `${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`);
+  };
+  applyViewBox();
+
+  if (data.shapes.length === 0) {
+    const empty = document.createElementNS(svg.namespaceURI, "text");
+    empty.setAttribute("x", String(bounds.minX + bounds.width * 0.5));
+    empty.setAttribute("y", String(bounds.minY + bounds.height * 0.5));
+    empty.setAttribute("text-anchor", "middle");
+    empty.setAttribute("font-size", String(Math.max(bounds.width, bounds.height) / 34));
+    empty.setAttribute("fill", "currentColor");
+    empty.textContent = "已识别版图文件，当前文件未解析出可绘制几何";
+    svg.append(empty);
+  }
+
+  const layerIndex = new Map([...data.layers.keys()].sort((a, b) => a.localeCompare(b)).map((layer, index) => [layer, index]));
+  for (const shape of data.shapes.slice(0, 6000)) {
+    const color = layoutPalette[(layerIndex.get(shape.layer) || 0) % layoutPalette.length];
+    if (shape.kind === "path") {
+      const polyline = document.createElementNS(svg.namespaceURI, "polyline");
+      polyline.setAttribute("points", shape.points.map(([x, y]) => `${x},${-y}`).join(" "));
+      polyline.setAttribute("fill", "none");
+      polyline.setAttribute("stroke", color);
+      polyline.setAttribute("stroke-width", String(Math.max(bounds.stroke, Math.abs(shape.width || 0))));
+      polyline.setAttribute("stroke-linecap", "round");
+      polyline.setAttribute("stroke-linejoin", "round");
+      applyLayer(polyline, shape.layer);
+      svg.append(polyline);
+      continue;
+    }
+    const polygon = document.createElementNS(svg.namespaceURI, "polygon");
+    polygon.setAttribute("points", shape.points.map(([x, y]) => `${x},${-y}`).join(" "));
+    polygon.setAttribute("fill", color);
+    polygon.setAttribute("fill-opacity", "0.18");
+    polygon.setAttribute("stroke", color);
+    polygon.setAttribute("stroke-width", String(bounds.stroke));
+    polygon.setAttribute("vector-effect", "non-scaling-stroke");
+    applyLayer(polygon, shape.layer);
+    svg.append(polygon);
+  }
+
+  for (const label of data.labels.slice(0, 400)) {
+    const text = document.createElementNS(svg.namespaceURI, "text");
+    text.setAttribute("x", String(label.x));
+    text.setAttribute("y", String(-label.y));
+    text.setAttribute("font-size", String(Math.max(bounds.stroke * 12, Math.max(bounds.width, bounds.height) / 120)));
+    text.setAttribute("fill", "currentColor");
+    text.textContent = label.text;
+    applyLayer(text, label.layer);
+    svg.append(text);
+  }
+
+  const layers = [...data.layers.keys()].sort((a, b) => a.localeCompare(b));
+  if (layers.length > 0) {
+    section.append(createLayoutLayerControls(svg, layers, data.layers));
+  }
+  section.append(svg);
+  if (data.cells.length > 0) {
+    section.append(createLayoutCellList(data.cells, data.references));
+  }
+  panel.append(section);
+
+  const updateToolbarZoom = () => ctx.toolbar?.setZoom(initialViewBox.width / currentViewBox.width);
+  updateToolbarZoom();
+
+  return {
+    canCommand(command) {
+      return command === "zoom-in" || command === "zoom-out" || command === "zoom-reset";
+    },
+    command(command) {
+      if (command === "zoom-in" || command === "zoom-out") {
+        const factor = command === "zoom-in" ? 0.82 : 1.18;
+        const centerX = currentViewBox.x + currentViewBox.width / 2;
+        const centerY = currentViewBox.y + currentViewBox.height / 2;
+        currentViewBox.width *= factor;
+        currentViewBox.height *= factor;
+        currentViewBox.x = centerX - currentViewBox.width / 2;
+        currentViewBox.y = centerY - currentViewBox.height / 2;
+        applyViewBox();
+        updateToolbarZoom();
+        return true;
+      }
+      if (command === "zoom-reset") {
+        currentViewBox = { ...initialViewBox };
+        applyViewBox();
+        updateToolbarZoom();
+        return true;
+      }
+      return false;
+    },
+    destroy() {
+      ctx.toolbar?.setZoom(undefined);
+    }
+  };
+}
+
+function parseGdsLayout(bytes: Uint8Array, fileName: string): LayoutPreviewData {
+  const shapes: LayoutShape[] = [];
+  const labels: LayoutLabel[] = [];
+  const references: LayoutReference[] = [];
+  const cells: string[] = [];
+  const layers = new Map<string, number>();
+  const recordCounts = new Map<string, number>();
+  const warnings: string[] = [];
+  let libraryName = "";
+  let version = "";
+  let unit = "";
+  let offset = 0;
+  let current: Partial<LayoutShape> & Partial<LayoutLabel> & { cell?: string } = {};
+  let currentKind = "";
+
+  while (offset + 4 <= bytes.length) {
+    const length = readUInt16(bytes, offset);
+    const recordType = bytes[offset + 2];
+    const data = bytes.slice(offset + 4, offset + length);
+    const name = gdsRecordNames[recordType] || `0x${recordType.toString(16).padStart(2, "0")}`;
+    recordCounts.set(name, (recordCounts.get(name) || 0) + 1);
+    if (length < 4 || offset + length > bytes.length) {
+      warnings.push(`GDS 记录在 ${offset} 字节处长度异常，已停止解析。`);
+      break;
+    }
+
+    if (recordType === 0x00 && data.length >= 2) {
+      version = String(readUInt16(data, 0));
+    } else if (recordType === 0x02) {
+      libraryName = readGdsString(data);
+    } else if (recordType === 0x03 && data.length >= 16) {
+      unit = `${formatGdsReal(data, 0)} / ${formatGdsReal(data, 8)}`;
+    } else if (recordType === 0x06) {
+      cells.push(readGdsString(data));
+    } else if (recordType === 0x08 || recordType === 0x09 || recordType === 0x2d) {
+      currentKind = recordType === 0x09 ? "path" : recordType === 0x2d ? "box" : "boundary";
+      current = { kind: currentKind as LayoutShape["kind"], layer: "0", datatype: "0", points: [] };
+    } else if (recordType === 0x0c) {
+      currentKind = "text";
+      current = { layer: "0", text: "", x: 0, y: 0 };
+    } else if (recordType === 0x0a || recordType === 0x0b) {
+      currentKind = "reference";
+      current = { cell: "", x: 0, y: 0 };
+    } else if (recordType === 0x0d && data.length >= 2) {
+      current.layer = String(readInt16(data, 0));
+    } else if ((recordType === 0x0e || recordType === 0x16) && data.length >= 2) {
+      current.datatype = String(readInt16(data, 0));
+    } else if (recordType === 0x0f && data.length >= 4) {
+      current.width = Math.abs(readInt32(data, 0));
+    } else if (recordType === 0x10) {
+      const points = readGdsPoints(data);
+      if (currentKind === "text" && points[0]) {
+        current.x = points[0][0];
+        current.y = points[0][1];
+      } else if (currentKind === "reference" && points[0]) {
+        current.x = points[0][0];
+        current.y = points[0][1];
+      } else {
+        current.points = points;
+      }
+    } else if (recordType === 0x12) {
+      current.cell = readGdsString(data);
+    } else if (recordType === 0x19) {
+      current.text = readGdsString(data);
+    } else if (recordType === 0x11) {
+      if ((currentKind === "boundary" || currentKind === "path" || currentKind === "box") && current.points && current.points.length > 1) {
+        const shape: LayoutShape = {
+          kind: current.kind || "boundary",
+          layer: String(current.layer || "0"),
+          datatype: current.datatype,
+          points: current.points,
+          width: current.width
+        };
+        shapes.push(shape);
+        layers.set(shape.layer, (layers.get(shape.layer) || 0) + 1);
+      } else if (currentKind === "text" && current.text) {
+        const label: LayoutLabel = {
+          layer: String(current.layer || "0"),
+          text: String(current.text),
+          x: Number(current.x || 0),
+          y: Number(current.y || 0)
+        };
+        labels.push(label);
+        layers.set(label.layer, (layers.get(label.layer) || 0) + 1);
+      } else if (currentKind === "reference" && current.cell) {
+        references.push({ cell: String(current.cell), x: Number(current.x || 0), y: Number(current.y || 0) });
+      }
+      current = {};
+      currentKind = "";
+    }
+
+    offset += length;
+  }
+
+  return {
+    format: "GDSII",
+    fileName,
+    libraryName,
+    version: version ? `Stream ${version}` : undefined,
+    unit,
+    cells,
+    shapes,
+    labels,
+    references,
+    layers,
+    metadata: [
+      ["大小", formatBytes(bytes.byteLength)],
+      ["记录", sumCounts(recordCounts)],
+      ["记录类型", recordCounts.size]
+    ],
+    notes: [
+      `已从 GDSII Stream 中解析 ${shapes.length} 个几何、${references.length} 个 cell 引用和 ${labels.length} 段文字。`
+    ],
+    warnings
+  };
+}
+
+function parseOasisLayout(bytes: Uint8Array, fileName: string): LayoutPreviewData {
+  const chunks = extractOasisCblocks(bytes);
+  const expanded = chunks.flatMap((chunk) => [...chunk.bytes]);
+  const cellNames = uniqueHints([...extractAsciiRuns(bytes), ...chunks.flatMap((chunk) => extractAsciiRuns(chunk.bytes))])
+    .filter((item) => /^[A-Za-z_][\w$.-]{1,80}$/.test(item))
+    .filter((item) => !item.startsWith("S_"));
+  const propertyNames = uniqueHints(chunks.flatMap((chunk) => extractAsciiRuns(chunk.bytes)).filter((item) => item.startsWith("S_")));
+  const recordCounts = scanOasisRecordCounts(bytes);
+  const expandedCounts = scanOasisRecordCounts(new Uint8Array(expanded));
+  const layers = new Map<string, number>();
+  const shapes: LayoutShape[] = [];
+  const labels: LayoutLabel[] = [];
+  const references: LayoutReference[] = [];
+
+  for (const name of cellNames) {
+    references.push({ cell: name, x: 0, y: 0 });
+  }
+
+  const pseudo = createOasisStructureShapes(cellNames, chunks.length || recordCounts.size || 1);
+  for (const shape of pseudo) {
+    shapes.push(shape);
+    layers.set(shape.layer, (layers.get(shape.layer) || 0) + 1);
+  }
+  for (let index = 0; index < cellNames.length; index++) {
+    labels.push({ layer: "cell", text: cellNames[index], x: 12, y: -(18 + index * 18) });
+  }
+  if (cellNames.length > 0) {
+    layers.set("cell", (layers.get("cell") || 0) + cellNames.length);
+  }
+
+  const version = readOasisVersion(bytes);
+  const cblockText = chunks.length
+    ? `${chunks.length} 个，展开 ${formatBytes(chunks.reduce((sum, chunk) => sum + chunk.bytes.byteLength, 0))}`
+    : "未发现";
+  const notes = [
+    "OASIS 是高压缩芯片版图格式，当前版本提供浏览器端识别、CBLOCK 解压、cell/属性结构和轻量结构示意；完整几何高保真渲染建议后续接入专用 OASIS 解析器。"
+  ];
+  if (propertyNames.length > 0) {
+    notes.push(`识别到属性：${propertyNames.slice(0, 5).join("、")}`);
+  }
+
+  return {
+    format: "OASIS",
+    fileName,
+    version,
+    cells: cellNames,
+    shapes,
+    labels,
+    references: [],
+    layers,
+    metadata: [
+      ["大小", formatBytes(bytes.byteLength)],
+      ["CBLOCK", cblockText],
+      ["记录类型", recordCounts.size + expandedCounts.size],
+      ["可读片段", cellNames.length + propertyNames.length]
+    ],
+    notes,
+    warnings: cellNames.length === 0 ? ["当前 OASIS 文件未提取到 cell 名称，可能使用了更复杂的索引或加密/压缩布局。"] : []
+  };
+}
+
+function computeLayoutBounds(shapes: LayoutShape[], labels: LayoutLabel[], references: LayoutReference[]): LayoutBounds {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const shape of shapes) {
+    for (const [x, y] of shape.points) {
+      xs.push(x);
+      ys.push(-y);
+    }
+  }
+  for (const label of labels) {
+    xs.push(label.x, label.x + label.text.length * 12);
+    ys.push(-label.y, -label.y - 16);
+  }
+  for (const reference of references) {
+    xs.push(reference.x);
+    ys.push(-reference.y);
+  }
+  const minX = Math.min(...xs, 0);
+  const maxX = Math.max(...xs, 100);
+  const minY = Math.min(...ys, 0);
+  const maxY = Math.max(...ys, 100);
+  const width = Math.max(1, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+  const padding = Math.max(width, height) * 0.06;
+  return {
+    minX: minX - padding,
+    minY: minY - padding,
+    width: width + padding * 2,
+    height: height + padding * 2,
+    stroke: Math.max(width, height) / 900
+  };
+}
+
+function createLayoutLayerControls(svg: SVGSVGElement, layers: string[], counts: Map<string, number>): HTMLElement {
+  const controls = document.createElement("div");
+  controls.className = "ofv-cad-layers ofv-layout-layers";
+  const title = document.createElement("strong");
+  title.textContent = `图层 ${layers.length}`;
+  controls.append(title);
+
+  for (const layer of layers) {
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = true;
+    checkbox.addEventListener("change", () => {
+      for (const element of svg.querySelectorAll<SVGElement>(`[data-layer="${escapeCssAttribute(layer)}"]`)) {
+        element.style.display = checkbox.checked ? "" : "none";
+      }
+    });
+    const name = document.createElement("span");
+    name.textContent = `${layer} (${counts.get(layer) || 0})`;
+    label.append(checkbox, name);
+    controls.append(label);
+  }
+  return controls;
+}
+
+function createLayoutCellList(cells: string[], references: LayoutReference[]): HTMLElement {
+  const details = document.createElement("details");
+  details.className = "ofv-details ofv-layout-cells";
+  details.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = `Cell 结构 ${cells.length}`;
+  const list = document.createElement("ul");
+  const refCounts = countBy(references.map((reference) => reference.cell));
+  for (const cell of cells.slice(0, 120)) {
+    const item = document.createElement("li");
+    const count = refCounts.get(cell) || 0;
+    item.textContent = count > 0 ? `${cell} · 引用 ${count}` : cell;
+    list.append(item);
+  }
+  details.append(summary, list);
+  return details;
+}
+
+function readUInt16(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] << 8) | bytes[offset + 1];
+}
+
+function readInt16(bytes: Uint8Array, offset: number): number {
+  const value = readUInt16(bytes, offset);
+  return value & 0x8000 ? value - 0x10000 : value;
+}
+
+function readInt32(bytes: Uint8Array, offset: number): number {
+  const value = (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
+  return value | 0;
+}
+
+function readGdsString(bytes: Uint8Array): string {
+  return new TextDecoder("ascii").decode(bytes).replace(/\0+$/g, "").trim();
+}
+
+function readGdsPoints(bytes: Uint8Array): LayoutPoint[] {
+  const points: LayoutPoint[] = [];
+  for (let offset = 0; offset + 7 < bytes.length; offset += 8) {
+    points.push([readInt32(bytes, offset), readInt32(bytes, offset + 4)]);
+  }
+  return points;
+}
+
+function formatGdsReal(bytes: Uint8Array, offset: number): string {
+  const value = readGdsReal(bytes, offset);
+  if (!Number.isFinite(value) || value === 0) {
+    return "0";
+  }
+  if (Math.abs(value) < 0.001 || Math.abs(value) >= 10000) {
+    return value.toExponential(4);
+  }
+  return String(Number(value.toPrecision(6)));
+}
+
+function readGdsReal(bytes: Uint8Array, offset: number): number {
+  const first = bytes[offset];
+  if (!first) {
+    return 0;
+  }
+  const sign = first & 0x80 ? -1 : 1;
+  const exponent = (first & 0x7f) - 64;
+  let mantissa = 0;
+  for (let index = 1; index < 8; index++) {
+    mantissa = mantissa * 256 + bytes[offset + index];
+  }
+  return sign * (mantissa / Math.pow(2, 56)) * Math.pow(16, exponent);
+}
+
+function sumCounts(counts: Map<string, number>): number {
+  return [...counts.values()].reduce((sum, count) => sum + count, 0);
+}
+
+function extractOasisCblocks(bytes: Uint8Array): Array<{ offset: number; bytes: Uint8Array }> {
+  const chunks: Array<{ offset: number; bytes: Uint8Array }> = [];
+  const seen = new Set<string>();
+  const limit = Math.min(bytes.length, 250000);
+  for (let offset = 0; offset < limit; offset++) {
+    try {
+      const inflated = pako.inflateRaw(bytes.slice(offset));
+      if (inflated.byteLength < 4) {
+        continue;
+      }
+      const ascii = extractAsciiRuns(inflated);
+      const hasLayoutSignal = ascii.some((item) => item.startsWith("S_") || /TOP|CELL|DIE|SIZE/i.test(item));
+      const hasRecordSignal = inflated.some((byte) => byte >= 13 && byte <= 34);
+      if (!hasLayoutSignal && !hasRecordSignal) {
+        continue;
+      }
+      const signature = `${inflated.byteLength}:${Array.from(inflated.slice(0, 12)).join(",")}`;
+      if (seen.has(signature)) {
+        continue;
+      }
+      seen.add(signature);
+      chunks.push({ offset, bytes: inflated });
+      if (chunks.length >= 12) {
+        break;
+      }
+    } catch {
+      // Most byte offsets are not deflate streams; keep scanning.
+    }
+  }
+  return chunks;
+}
+
+function scanOasisRecordCounts(bytes: Uint8Array): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const byte of bytes.slice(0, Math.min(bytes.length, 12000))) {
+    const name = oasisRecordNames[byte];
+    if (name) {
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
+function readOasisVersion(bytes: Uint8Array): string | undefined {
+  const magic = "%SEMI-OASIS\r\n";
+  const header = new TextDecoder("ascii").decode(bytes.slice(0, Math.min(bytes.length, 48)));
+  if (!header.startsWith(magic)) {
+    return undefined;
+  }
+  const start = magic.length;
+  if (bytes[start] !== 1) {
+    return "OASIS";
+  }
+  const length = bytes[start + 1];
+  const version = new TextDecoder("ascii").decode(bytes.slice(start + 2, start + 2 + length));
+  return version ? `OASIS ${version}` : "OASIS";
+}
+
+function createOasisStructureShapes(cellNames: string[], fallbackCount: number): LayoutShape[] {
+  const rows = Math.max(1, cellNames.length || fallbackCount);
+  const shapes: LayoutShape[] = [];
+  for (let index = 0; index < rows; index++) {
+    const top = -(index * 18);
+    const height = 12;
+    const width = 88 + Math.min((cellNames[index]?.length || 5) * 4, 90);
+    shapes.push({
+      kind: "box",
+      layer: "cell",
+      points: [
+        [0, top],
+        [width, top],
+        [width, top - height],
+        [0, top - height],
+        [0, top]
+      ]
+    });
+  }
+  return shapes;
+}
 
 function renderBinaryCad(panel: HTMLElement, arrayBuffer: ArrayBuffer, extension: string, fileName: string): void {
   const bytes = new Uint8Array(arrayBuffer);

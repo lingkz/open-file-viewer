@@ -117,6 +117,25 @@ describe("archivePlugin", () => {
     expect(container.textContent).toContain("格式类型：.ZIP 压缩文件");
   });
 
+  it("decodes Windows GBK encoded zip entry names", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: minimalStoredZipWithRawName(new Uint8Array([0xce, 0xc4, 0xbc, 0xfe, 0x2e, 0x74, 0x78, 0x74]), "hello"),
+      fileName: "windows.zip",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-archive-item")));
+
+    const item = container.querySelector<HTMLButtonElement>(".ofv-archive-item");
+    expect(item?.textContent).toContain("文件.txt");
+    expect(item?.textContent).not.toContain("ÎÄ¼þ");
+    expect(item?.title).toBe("文件.txt");
+  });
+
   it("renders archive default summary with size, type distribution and risky paths", async () => {
     const zip = new JSZip();
     zip.file("docs/readme.txt", "hello");
@@ -508,6 +527,62 @@ function minimalRar4(): ArrayBuffer {
   view.setUint16(offset + 26, name.length, true);
   view.setUint32(offset + 28, 0, true);
   bytes.set(name, offset + 32);
+  return bytes.buffer;
+}
+
+function minimalStoredZipWithRawName(name: Uint8Array, content: string): ArrayBuffer {
+  const payload = new TextEncoder().encode(content);
+  const localHeaderSize = 30 + name.length;
+  const centralHeaderSize = 46 + name.length;
+  const totalSize = localHeaderSize + payload.length + centralHeaderSize + 22;
+  const bytes = new Uint8Array(totalSize);
+  const view = new DataView(bytes.buffer);
+  let offset = 0;
+
+  view.setUint32(offset, 0x04034b50, true);
+  view.setUint16(offset + 4, 20, true);
+  view.setUint16(offset + 6, 0, true);
+  view.setUint16(offset + 8, 0, true);
+  view.setUint16(offset + 10, 0, true);
+  view.setUint16(offset + 12, 0, true);
+  view.setUint32(offset + 14, 0, true);
+  view.setUint32(offset + 18, payload.length, true);
+  view.setUint32(offset + 22, payload.length, true);
+  view.setUint16(offset + 26, name.length, true);
+  view.setUint16(offset + 28, 0, true);
+  bytes.set(name, offset + 30);
+  bytes.set(payload, offset + localHeaderSize);
+  const centralOffset = localHeaderSize + payload.length;
+  offset = centralOffset;
+
+  view.setUint32(offset, 0x02014b50, true);
+  view.setUint16(offset + 4, 20, true);
+  view.setUint16(offset + 6, 20, true);
+  view.setUint16(offset + 8, 0, true);
+  view.setUint16(offset + 10, 0, true);
+  view.setUint16(offset + 12, 0, true);
+  view.setUint16(offset + 14, 0, true);
+  view.setUint32(offset + 16, 0, true);
+  view.setUint32(offset + 20, payload.length, true);
+  view.setUint32(offset + 24, payload.length, true);
+  view.setUint16(offset + 28, name.length, true);
+  view.setUint16(offset + 30, 0, true);
+  view.setUint16(offset + 32, 0, true);
+  view.setUint16(offset + 34, 0, true);
+  view.setUint16(offset + 36, 0, true);
+  view.setUint32(offset + 38, 0, true);
+  view.setUint32(offset + 42, 0, true);
+  bytes.set(name, offset + 46);
+  offset += centralHeaderSize;
+
+  view.setUint32(offset, 0x06054b50, true);
+  view.setUint16(offset + 4, 0, true);
+  view.setUint16(offset + 6, 0, true);
+  view.setUint16(offset + 8, 1, true);
+  view.setUint16(offset + 10, 1, true);
+  view.setUint32(offset + 12, centralHeaderSize, true);
+  view.setUint32(offset + 16, centralOffset, true);
+  view.setUint16(offset + 20, 0, true);
   return bytes.buffer;
 }
 

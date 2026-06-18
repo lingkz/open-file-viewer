@@ -98,6 +98,14 @@ describe("emailPlugin", () => {
 
     const container = document.createElement("div");
     document.body.append(container);
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+    vi.spyOn(window, "setTimeout").mockImplementation(((handler: TimerHandler, timeout?: number) => {
+      if (typeof handler === "function") {
+        handler();
+      }
+      return timeout === 300 ? 300 : 1000;
+    }) as typeof window.setTimeout);
+
     const viewer = createViewer({
       container,
       file: new Blob(["raw email"], { type: "message/rfc822" }),
@@ -107,23 +115,45 @@ describe("emailPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-email-body-iframe")));
     expect(container.querySelector(".ofv-email-body-iframe")?.getAttribute("sandbox")).toBe(
-      "allow-popups allow-popups-to-escape-sandbox"
+      "allow-same-origin allow-popups allow-popups-to-escape-sandbox"
     );
-    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
-    vi.spyOn(window, "setTimeout").mockImplementation(((handler: TimerHandler, timeout?: number) => {
-      if (typeof handler === "function") {
-        handler();
-      }
-      return timeout === 300 ? 300 : 1000;
-    }) as typeof window.setTimeout);
-
-    container.querySelector<HTMLIFrameElement>(".ofv-email-body-iframe")?.dispatchEvent(new Event("load"));
 
     viewer.destroy();
 
     expect(clearTimeoutSpy).toHaveBeenCalledWith(300);
     expect(clearTimeoutSpy).toHaveBeenCalledWith(1000);
     expect(clearTimeoutSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("writes HTML email bodies immediately even if iframe load is missed", async () => {
+    parseEmail.mockResolvedValueOnce({
+      from: { name: "Invoice", address: "invoice@example.com" },
+      to: [{ name: "Customer", address: "customer@example.com" }],
+      subject: "电子发票",
+      date: "2026-06-18",
+      html: "<div><p>尊敬的用户：</p><p>请下载附件，查收您的电子发票。</p></div>",
+      attachments: []
+    } as any);
+
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["raw email"], { type: "message/rfc822" }),
+      fileName: "invoice.eml",
+      plugins: [emailPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-email-body-iframe")));
+
+    const iframe = container.querySelector<HTMLIFrameElement>(".ofv-email-body-iframe");
+    await waitFor(() => iframe?.contentDocument?.body?.textContent?.includes("请下载附件") === true);
+
+    expect(iframe?.contentDocument?.body?.textContent).toContain("尊敬的用户");
+    expect(iframe?.contentDocument?.body?.textContent).toContain("电子发票");
+
+    viewer.destroy();
   });
 
   it("sanitizes HTML email bodies and secures external links", async () => {

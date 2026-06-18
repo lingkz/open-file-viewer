@@ -229,7 +229,7 @@ const matrix: FormatCase[] = [
   },
   {
     plugin: cadPlugin(),
-    extensions: ["dxf", "dwg", "dwf", "step", "stp", "iges", "igs", "ifc", "sat", "sab", "x_t", "x_b", "3dm", "skp", "sldprt", "sldasm"],
+    extensions: ["dxf", "dwg", "dwf", "step", "stp", "iges", "igs", "ifc", "sat", "sab", "x_t", "x_b", "3dm", "skp", "sldprt", "sldasm", "gds", "oas", "oasis"],
     mimeType: "image/vnd.dxf"
   },
   {
@@ -623,6 +623,9 @@ function routingCases(): Array<{ extension: string; mimeType: string; expected: 
     { extension: "skp", mimeType: "application/vnd.sketchup.skp", expected: "cad" },
     { extension: "sldprt", mimeType: "application/sldworks", expected: "cad" },
     { extension: "sldasm", mimeType: "application/sldworks", expected: "cad" },
+    { extension: "gds", mimeType: "application/vnd.gds", expected: "cad" },
+    { extension: "oas", mimeType: "application/vnd.oasis.layout", expected: "cad" },
+    { extension: "oasis", mimeType: "application/vnd.oasis.layout", expected: "cad" },
     ...casesFor("model3d", ["gltf", "glb", "obj", "stl", "fbx", "dae", "ply", "3mf", "3ds", "usd", "usda", "usdc", "usdz", "wrl", "vrml"], "model/gltf-binary"),
     ...casesFor("gis", ["geojson", "topojson", "kml", "kmz", "gpx", "shp"], "application/geo+json"),
     ...casesFor("asset", ["ttf", "otf", "woff", "woff2", "eot", "psd", "psb", "ai", "eps", "ps", "webarchive", "sqlite", "sqlite3", "db", "wasm", "parquet", "avro"], "application/octet-stream"),
@@ -840,6 +843,10 @@ function mimeOnlyRoutingCases(): Array<{ mimeType: string; expected: string }> {
     { mimeType: "model/vnd.3dm", expected: "cad" },
     { mimeType: "application/vnd.sketchup.skp", expected: "cad" },
     { mimeType: "application/sldworks", expected: "cad" },
+    { mimeType: "application/vnd.gds", expected: "cad" },
+    { mimeType: "application/x-gdsii", expected: "cad" },
+    { mimeType: "application/vnd.oasis.layout", expected: "cad" },
+    { mimeType: "application/x-oasis-layout", expected: "cad" },
     ...mimeCasesFor("office", [
       "application/msword",
       "application/rtf",

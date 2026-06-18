@@ -275,7 +275,7 @@ const plugins = [
 | 压缩包 | `archivePlugin()` | `zip`, `rar`, `7z`, `tar`, `gz`, `tgz`, `bz2`, `xz` |
 | 邮件 | `emailPlugin()` | `eml`, `msg`, `mbox` |
 | 绘图 / 白板 | `drawingPlugin()` | `drawio`, `dio`, `excalidraw`, `tldraw` |
-| CAD / 工程 | `cadPlugin()` | `dxf`, `dwg`, `dwf`, `step`, `stp`, `iges`, `igs`, `ifc`, `skp`, `sldprt` |
+| CAD / 工程 / 芯片版图 | `cadPlugin()` | `dxf`, `dwg`, `dwf`, `step`, `stp`, `iges`, `igs`, `ifc`, `skp`, `sldprt`, `gds`, `oas`, `oasis` |
 | 3D 模型 | `model3dPlugin()` | `gltf`, `glb`, `obj`, `stl`, `fbx`, `dae`, `ply`, `3mf`, `usd`, `usdz` |
 | GIS | `gisPlugin()` | `geojson`, `topojson`, `kml`, `kmz`, `gpx`, `shp` |
 | 资产识别 | `assetPlugin()` | `ttf`, `woff2`, `psd`, `ai`, `eps`, `sqlite`, `wasm`, `parquet`, `avro` |

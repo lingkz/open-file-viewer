@@ -71,7 +71,9 @@ export function archivePlugin(): PreviewPlugin {
       try {
         if (ext === "zip") {
           try {
-            const zip = await JSZip.loadAsync(await readArrayBuffer(ctx.file));
+            const zip = await JSZip.loadAsync(await readArrayBuffer(ctx.file), {
+              decodeFileName: decodeZipFileName
+            });
             archiveEntries = Object.values(zip.files).map((entry) => ({
               name: entry.name,
               unsafeName: (entry as any).unsafeOriginalName,
@@ -438,6 +440,35 @@ async function findSubPreviewPlugin(plugins: PreviewPlugin[], file: PreviewFile)
     }
   }
   return fallbackPlugin();
+}
+
+function decodeZipFileName(bytes: string[] | Uint8Array | ArrayLike<number>): string {
+  const data = Array.isArray(bytes)
+    ? Uint8Array.from(bytes.map((value) => value.charCodeAt(0) & 0xff))
+    : bytes instanceof Uint8Array
+      ? bytes
+      : Uint8Array.from(bytes);
+  const utf8 = decodeZipNameWith(data, "utf-8", true);
+  if (utf8 && !looksMojibake(utf8)) {
+    return utf8;
+  }
+  const gb18030 = decodeZipNameWith(data, "gb18030", false) || decodeZipNameWith(data, "gbk", false);
+  if (gb18030 && !looksMojibake(gb18030)) {
+    return gb18030;
+  }
+  return utf8 || new TextDecoder("latin1").decode(data);
+}
+
+function decodeZipNameWith(bytes: Uint8Array, encoding: string, fatal: boolean): string | undefined {
+  try {
+    return new TextDecoder(encoding, { fatal }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+}
+
+function looksMojibake(value: string): boolean {
+  return /[\uFFFDÃÂÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß]/.test(value);
 }
 
 function createInlineError(titleText: string, detailText: string): HTMLElement {

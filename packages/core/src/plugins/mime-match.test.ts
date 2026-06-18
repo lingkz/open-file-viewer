@@ -36,6 +36,8 @@ describe("plugin MIME matching", () => {
     expect(await ofdPlugin().match(file("application/ofd"))).toBe(true);
     expect(await cadPlugin().match(file("application/acad"))).toBe(true);
     expect(await cadPlugin().match(file("image/vnd.dxf"))).toBe(true);
+    expect(await cadPlugin().match(file("application/vnd.gds"))).toBe(true);
+    expect(await cadPlugin().match(file("application/vnd.oasis.layout"))).toBe(true);
     expect(await drawingPlugin().match(file("application/vnd.jgraph.mxfile"))).toBe(true);
     expect(await drawingPlugin().match(file("application/vnd.excalidraw+json"))).toBe(true);
     expect(await model3dPlugin().match(file("model/gltf-binary"))).toBe(true);

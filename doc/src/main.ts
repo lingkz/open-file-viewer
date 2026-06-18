@@ -211,7 +211,7 @@ const formats = [
   { title: "PDF / Office", icon: "document", level: { zh: "高频业务文档", en: "Business documents" }, items: "pdf docx docm dotx dotm rtf odt xlsx xlsm ods pptx pptm odp ofd epub xps" },
   { title: "Image / Media", icon: "media", level: { zh: "浏览器原生与增强", en: "Native and enhanced" }, items: "jpg jpeg png gif webp avif jxl svg bmp ico heic heif mp4 webm m3u8 mp3 wav flac midi" },
   { title: "Text / Code", icon: "code", level: { zh: "高亮与编辑器模式", en: "Highlight and editor mode" }, items: "txt md json jsonc json5 ipynb yaml toml ini proto hcl tex gv http js ts vue react css html py go rs rb swift kt" },
-  { title: "Engineering", icon: "engineering", level: { zh: "工程资料与结构预览", en: "Engineering and structure" }, items: "dxf dwg step ifc gltf glb obj stl fbx dae 3mf usdz geojson kml kmz gpx shp drawio excalidraw" },
+  { title: "Engineering", icon: "engineering", level: { zh: "工程资料、芯片版图与结构预览", en: "Engineering, layout and structure" }, items: "dxf dwg step ifc gds oas oasis gltf glb obj stl fbx dae 3mf usdz geojson kml kmz gpx shp drawio excalidraw" },
   { title: "Archive / Email", icon: "archive", level: { zh: "目录、正文与附件", en: "Structure, body and attachments" }, items: "zip rar 7z tar gz tgz bz2 xz eml msg mbox" },
   { title: "Assets / Data", icon: "data", level: { zh: "结构解析与安全摘要", en: "Structure parsing and safe summaries" }, items: "ttf otf woff woff2 psd ai eps sqlite wasm parquet avro webarchive" }
 ];
@@ -322,6 +322,7 @@ Contract,pdf,Stable
 Report,docx,Enhanced
 Map,geojson,Preview
 Drawing,dxf,Preview
+Layout,gds,Preview
 Archive,zip,Preview
 `
       ],

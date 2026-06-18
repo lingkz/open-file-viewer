@@ -116,15 +116,15 @@ export function emailPlugin(): PreviewPlugin {
           // Parse EML or MBOX text formats
           const PostalMime = (await import("postal-mime")).default;
           const parser = new PostalMime();
-          
-          let rawText = await readTextFile(ctx.file);
+          let rawSource: string | ArrayBuffer = await readArrayBuffer(ctx.file);
           if (ext === "mbox") {
+            let rawText = await readTextFile(ctx.file);
             const messages = splitMboxMessages(rawText);
             mboxSummary = messages.map(summarizeMboxMessage);
-            rawText = messages[0] || rawText;
+            rawSource = messages[0] || rawText;
           }
 
-          const parsed = await parser.parse(rawText);
+          const parsed = await parser.parse(rawSource);
 
           const from = parsed.from ? `${parsed.from.name || ""} <${parsed.from.address || ""}>`.trim() : "";
           const to = Array.isArray(parsed.to)
@@ -217,14 +217,17 @@ export function emailPlugin(): PreviewPlugin {
           // Render in a sandboxed iframe to prevent styles leaking
           const iframe = document.createElement("iframe");
           iframe.className = "ofv-email-body-iframe";
-          iframe.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+          iframe.setAttribute("sandbox", "allow-same-origin allow-popups allow-popups-to-escape-sandbox");
           iframe.style.cssText = "width: 100%; border: none; background: #fff; min-height: 200px;";
-          bodySection.append(iframe);
-
-          iframe.onload = () => {
+          let renderedHtmlBody = false;
+          const renderHtmlBody = () => {
+            if (renderedHtmlBody) {
+              return;
+            }
             try {
               const idoc = iframe.contentDocument || iframe.contentWindow?.document;
               if (idoc) {
+                renderedHtmlBody = true;
                 idoc.open();
                 idoc.write(`
                   <!doctype html>
@@ -278,6 +281,9 @@ export function emailPlugin(): PreviewPlugin {
               console.error("Failed to write html body to email iframe:", err);
             }
           };
+          iframe.addEventListener("load", renderHtmlBody, { once: true });
+          bodySection.append(iframe);
+          renderHtmlBody();
         } else {
           // Render plain text body
           const pre = document.createElement("pre");
