@@ -110,6 +110,7 @@ export function imagePlugin(): PreviewPlugin {
       let dragStartY = 0;
       let startOffsetX = 0;
       let startOffsetY = 0;
+      let activePointerId: number | null = null;
 
       const zoomLabel = document.createElement("span");
       zoomLabel.className = "ofv-image-zoom";
@@ -167,17 +168,25 @@ export function imagePlugin(): PreviewPlugin {
         if (event.button !== 0) {
           return;
         }
+        if (activePointerId !== null && activePointerId !== event.pointerId) {
+          finishDrag(activePointerId);
+        }
         dragging = true;
+        activePointerId = event.pointerId;
         dragStartX = event.clientX;
         dragStartY = event.clientY;
         startOffsetX = offsetX;
         startOffsetY = offsetY;
         stage.classList.add("is-dragging");
-        stage.setPointerCapture(event.pointerId);
+        try {
+          stage.setPointerCapture(event.pointerId);
+        } catch {
+          // Pointer capture can fail if the pointer was already released by the browser.
+        }
       };
 
       const onPointerMove = (event: PointerEvent) => {
-        if (!dragging) {
+        if (!dragging || event.pointerId !== activePointerId) {
           return;
         }
         offsetX = startOffsetX + event.clientX - dragStartX;
@@ -185,12 +194,42 @@ export function imagePlugin(): PreviewPlugin {
         updateTransform();
       };
 
-      const onPointerUp = (event: PointerEvent) => {
+      const finishDrag = (pointerId?: number | null) => {
+        const captureId = pointerId ?? activePointerId;
         dragging = false;
+        activePointerId = null;
         stage.classList.remove("is-dragging");
-        if (stage.hasPointerCapture(event.pointerId)) {
-          stage.releasePointerCapture(event.pointerId);
+        if (captureId !== null && captureId !== undefined) {
+          try {
+            if (stage.hasPointerCapture(captureId)) {
+              stage.releasePointerCapture(captureId);
+            }
+          } catch {
+            // Ignore stale pointer ids.
+          }
         }
+      };
+
+      const onPointerUp = (event: PointerEvent) => {
+        if (event.pointerId === activePointerId) {
+          finishDrag(event.pointerId);
+        }
+      };
+
+      const onLostPointerCapture = (event: PointerEvent) => {
+        if (event.pointerId === activePointerId) {
+          finishDrag(null);
+        }
+      };
+
+      const onPointerLeave = (event: PointerEvent) => {
+        if (event.pointerId === activePointerId && event.buttons === 0) {
+          finishDrag(event.pointerId);
+        }
+      };
+
+      const onWindowBlur = () => {
+        finishDrag();
       };
 
       const onWheel = (event: WheelEvent) => {
@@ -205,8 +244,11 @@ export function imagePlugin(): PreviewPlugin {
       stage.addEventListener("pointermove", onPointerMove);
       stage.addEventListener("pointerup", onPointerUp);
       stage.addEventListener("pointercancel", onPointerUp);
+      stage.addEventListener("lostpointercapture", onLostPointerCapture);
+      stage.addEventListener("pointerleave", onPointerLeave);
       stage.addEventListener("wheel", onWheel, { passive: false });
       image.addEventListener("error", showImageFallback);
+      window.addEventListener("blur", onWindowBlur);
 
       stage.append(image);
       wrapper.append(...(showInlineControls ? [controls, stage, infoBar] : [stage, infoBar]));
@@ -261,8 +303,12 @@ export function imagePlugin(): PreviewPlugin {
           stage.removeEventListener("pointermove", onPointerMove);
           stage.removeEventListener("pointerup", onPointerUp);
           stage.removeEventListener("pointercancel", onPointerUp);
+          stage.removeEventListener("lostpointercapture", onLostPointerCapture);
+          stage.removeEventListener("pointerleave", onPointerLeave);
           stage.removeEventListener("wheel", onWheel);
           image.removeEventListener("error", showImageFallback);
+          window.removeEventListener("blur", onWindowBlur);
+          finishDrag();
           wrapper.remove();
           if (convertedBlob) {
             URL.revokeObjectURL(url);

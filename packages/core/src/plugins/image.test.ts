@@ -11,6 +11,7 @@ vi.mock("heic2any", () => ({
 describe("imagePlugin", () => {
   afterEach(() => {
     document.body.replaceChildren();
+    restorePointerCaptureMocks();
     vi.restoreAllMocks();
   });
 
@@ -80,6 +81,42 @@ describe("imagePlugin", () => {
 
     expect(container.querySelector(".ofv-toolbar")).toBeNull();
     expect(container.querySelector(".ofv-image-controls")).not.toBeNull();
+
+    viewer.destroy();
+  });
+
+  it("recovers dragging after pointer capture is lost", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    installPointerCaptureMocks();
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:drag-image"),
+      revokeObjectURL: vi.fn()
+    });
+
+    const viewer = createViewer({
+      container,
+      file: new Blob(["<svg></svg>"], { type: "image/svg+xml" }),
+      fileName: "image.svg",
+      plugins: [imagePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-image-content")));
+
+    const stage = container.querySelector<HTMLElement>(".ofv-image-stage")!;
+    const image = container.querySelector<HTMLImageElement>(".ofv-image-content")!;
+    stage.dispatchEvent(pointerEvent("pointerdown", { pointerId: 1, clientX: 10, clientY: 10, button: 0, buttons: 1 }));
+    expect(stage.classList.contains("is-dragging")).toBe(true);
+
+    stage.dispatchEvent(pointerEvent("lostpointercapture", { pointerId: 1, clientX: 10, clientY: 10, button: 0, buttons: 0 }));
+    expect(stage.classList.contains("is-dragging")).toBe(false);
+
+    stage.dispatchEvent(pointerEvent("pointerdown", { pointerId: 2, clientX: 20, clientY: 20, button: 0, buttons: 1 }));
+    stage.dispatchEvent(pointerEvent("pointermove", { pointerId: 2, clientX: 52, clientY: 44, button: 0, buttons: 1 }));
+    expect(image.style.transform).toContain("translate(32px, 24px)");
+    stage.dispatchEvent(pointerEvent("pointerup", { pointerId: 2, clientX: 52, clientY: 44, button: 0, buttons: 0 }));
+    expect(stage.classList.contains("is-dragging")).toBe(false);
 
     viewer.destroy();
   });
@@ -457,6 +494,53 @@ function uint32Be(value: number): number[] {
   return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
 }
 
+type PointerCaptureKey = "setPointerCapture" | "hasPointerCapture" | "releasePointerCapture";
+
+const pointerCaptureKeys: PointerCaptureKey[] = ["setPointerCapture", "hasPointerCapture", "releasePointerCapture"];
+const originalPointerCaptureDescriptors = new Map<PointerCaptureKey, PropertyDescriptor | undefined>();
+
+function installPointerCaptureMocks(): void {
+  const capturedPointers = new Set<number>();
+  for (const key of pointerCaptureKeys) {
+    if (!originalPointerCaptureDescriptors.has(key)) {
+      originalPointerCaptureDescriptors.set(key, Object.getOwnPropertyDescriptor(HTMLElement.prototype, key));
+    }
+  }
+  Object.defineProperties(HTMLElement.prototype, {
+    setPointerCapture: {
+      configurable: true,
+      value: vi.fn((pointerId: number) => {
+        capturedPointers.add(pointerId);
+      })
+    },
+    hasPointerCapture: {
+      configurable: true,
+      value: vi.fn((pointerId: number) => capturedPointers.has(pointerId))
+    },
+    releasePointerCapture: {
+      configurable: true,
+      value: vi.fn((pointerId: number) => {
+        capturedPointers.delete(pointerId);
+      })
+    }
+  });
+}
+
+function restorePointerCaptureMocks(): void {
+  for (const key of pointerCaptureKeys) {
+    if (!originalPointerCaptureDescriptors.has(key)) {
+      continue;
+    }
+    const descriptor = originalPointerCaptureDescriptors.get(key);
+    if (descriptor) {
+      Object.defineProperty(HTMLElement.prototype, key, descriptor);
+    } else {
+      delete (HTMLElement.prototype as unknown as Record<PointerCaptureKey, unknown>)[key];
+    }
+    originalPointerCaptureDescriptors.delete(key);
+  }
+}
+
 async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> {
   const start = Date.now();
   while (!predicate()) {
@@ -465,4 +549,17 @@ async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> 
     }
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
+}
+
+function pointerEvent(type: string, init: PointerEventInit): Event {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: init.button,
+    buttons: init.buttons,
+    clientX: init.clientX,
+    clientY: init.clientY
+  }) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: init.pointerId ?? 1 });
+  return event;
 }
