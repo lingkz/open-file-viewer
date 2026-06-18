@@ -1,5 +1,6 @@
 import { createObjectUrl, revokeObjectUrl } from "../dom";
 import type { PreviewPlugin, PreviewSize } from "../types";
+import { createEncryptedFallback, isEncryptedError } from "./encrypted";
 
 type PdfJsModule = typeof import("pdfjs-dist");
 
@@ -58,7 +59,13 @@ export function pdfPlugin(options: PdfJsModule | PdfPluginOptions = {}): Preview
       const doc = await documentTask.promise.catch((error: unknown) => {
         viewer.remove();
         ctx.viewport.classList.add("ofv-center");
-        const fallback = createPdfFallback(ctx.file.name, url, normalizePdfError(error));
+        const fallback = isEncryptedError(error)
+          ? createEncryptedFallback(ctx.file, url, {
+              title: "PDF 已加密，无法在线预览",
+              message: "请下载后使用密码打开，或上传解密后的 PDF 文件。",
+              action: "下载 PDF"
+            })
+          : createPdfFallback(ctx.file.name, url, normalizePdfError(error));
         ctx.viewport.append(fallback);
         return undefined;
       });
@@ -424,9 +431,6 @@ function normalizePdfError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error || "");
   const name = typeof error === "object" && error !== null && "name" in error ? String((error as { name?: unknown }).name) : "";
   const lower = `${name} ${message}`.toLowerCase();
-  if (lower.includes("password")) {
-    return "该 PDF 受密码保护，当前无法在浏览器内直接预览。";
-  }
   if (lower.includes("invalid") || lower.includes("missing") || lower.includes("corrupt")) {
     return "该 PDF 文件可能已损坏或格式无效。";
   }

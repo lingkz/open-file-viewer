@@ -414,6 +414,27 @@ describe("ofdPlugin", () => {
     expect(container.querySelector<HTMLAnchorElement>(".ofv-fallback a")?.href).toBe(objectUrl);
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it("shows the unified encrypted state for protected OFD packages", async () => {
+    const objectUrl = "blob:locked-ofd";
+    vi.spyOn(URL, "createObjectURL").mockReturnValue(objectUrl);
+    vi.spyOn(JSZip, "loadAsync").mockRejectedValueOnce(new Error("encrypted OFD requires password"));
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob(["locked"], { type: "application/ofd" }),
+      fileName: "locked.ofd",
+      plugins: [ofdPlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-encrypted")));
+
+    expect(container.textContent).toContain("OFD 文件已加密，无法在线预览");
+    expect(container.textContent).toContain("上传解密后的 OFD 文件");
+    expect(container.querySelector<HTMLAnchorElement>(".ofv-fallback a")?.href).toBe(objectUrl);
+  });
 });
 
 async function waitFor(predicate: () => boolean, timeout = 1000): Promise<void> {

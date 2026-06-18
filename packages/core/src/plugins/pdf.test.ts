@@ -188,8 +188,9 @@ describe("pdfPlugin", () => {
 
     await waitFor(() => Boolean(container.querySelector(".ofv-fallback")));
 
-    expect(container.textContent).toContain("PDF 预览失败");
-    expect(container.textContent).toContain("密码保护");
+    expect(container.querySelector(".ofv-encrypted")).not.toBeNull();
+    expect(container.textContent).toContain("PDF 已加密，无法在线预览");
+    expect(container.textContent).toContain("上传解密后的 PDF 文件");
     expect(container.querySelector<HTMLAnchorElement>(".ofv-fallback a")?.href).toBe(objectUrl);
     expect(onError).not.toHaveBeenCalled();
 

@@ -5,6 +5,7 @@ import { normalizeFile } from "../detect";
 import { fallbackPlugin } from "./fallback";
 import { createObjectUrl, revokeObjectUrl } from "../dom";
 import { appendMeta, createPanel, createSection, readArrayBuffer, resolveFormat } from "./utils";
+import { createEncryptedFallback, isEncryptedError } from "./encrypted";
 
 const archiveExtensions = new Set(["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"]);
 const archiveMimeTypes = new Set([
@@ -83,12 +84,7 @@ export function archivePlugin(): PreviewPlugin {
             }));
           } catch (zipErr: any) {
             // Check for encryption errors
-            if (
-              zipErr.message &&
-              (zipErr.message.includes("encrypted") ||
-                zipErr.message.includes("password") ||
-                zipErr.message.includes("protected"))
-            ) {
+            if (isEncryptedError(zipErr)) {
               isEncrypted = true;
             } else {
               throw zipErr;
@@ -129,21 +125,11 @@ export function archivePlugin(): PreviewPlugin {
 
       // 2. Encrypted Archive Prompt UI
       if (isEncrypted) {
-        const fallback = document.createElement("div");
-        fallback.className = "ofv-fallback";
-        
-        const title = document.createElement("strong");
-        title.textContent = "该压缩包已被加密保护";
-        
-        const meta = document.createElement("span");
-        meta.textContent = "为了您的数据安全，本预览器不支持直接在线解密。请下载文件后在本地输入密码解压。";
-        
-        const download = document.createElement("a");
-        download.href = url;
-        download.download = ctx.file.name;
-        download.textContent = "下载文件";
-        
-        fallback.append(title, meta, download);
+        const fallback = createEncryptedFallback(ctx.file, url, {
+          title: "压缩包已加密，无法在线预览",
+          message: "请下载后在本地输入密码解压，或上传解密后的压缩包。",
+          action: "下载压缩包"
+        });
         panel.append(fallback);
         ctx.viewport.classList.add("ofv-center");
         

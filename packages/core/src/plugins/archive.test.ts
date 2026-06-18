@@ -240,6 +240,27 @@ describe("archivePlugin", () => {
     expect(layout?.classList.contains("is-sidebar-collapsed")).toBe(true);
   });
 
+  it("shows the unified encrypted state for password protected archives", async () => {
+    const objectUrl = "blob:locked-zip";
+    vi.spyOn(URL, "createObjectURL").mockReturnValue(objectUrl);
+    vi.spyOn(JSZip, "loadAsync").mockRejectedValueOnce(new Error("encrypted zip requires password"));
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: new Blob(["locked"], { type: "application/zip" }),
+      fileName: "locked.zip",
+      plugins: [archivePlugin()]
+    });
+
+    await waitFor(() => Boolean(container.querySelector(".ofv-encrypted")));
+
+    expect(container.textContent).toContain("压缩包已加密，无法在线预览");
+    expect(container.textContent).toContain("上传解密后的压缩包");
+    expect(container.querySelector<HTMLAnchorElement>(".ofv-fallback a")?.href).toBe(objectUrl);
+  });
+
   it("renders RAR4 header entries without falling back to unsupported copy", async () => {
     const container = document.createElement("div");
     document.body.append(container);

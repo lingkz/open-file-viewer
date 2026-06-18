@@ -561,6 +561,10 @@ async function renderSheet(
 }
 
 function renderSheetFallback(panel: HTMLElement, extension: string, detail: string): void {
+  if (isEncryptedText(detail)) {
+    renderEncryptedOfficeByFileInfo(panel, `.${extension || "sheet"}`, "Office 文件已加密，无法在线预览");
+    return;
+  }
   const section = createSection("表格解析失败");
   const title = document.createElement("p");
   title.textContent = `.${extension || "sheet"} 文件无法解析为可预览表格。`;
@@ -570,6 +574,19 @@ function renderSheetFallback(panel: HTMLElement, extension: string, detail: stri
   support.textContent = "请确认文件未加密、未损坏，或先转换为 XLSX/CSV/ODS 后再预览。";
   section.append(title, meta, support);
   panel.append(section);
+}
+
+function renderEncryptedOfficeByFileInfo(panel: HTMLElement, fileLabel: string, title: string): void {
+  const section = createSection(title);
+  section.classList.add("ofv-encrypted");
+  const message = document.createElement("p");
+  message.textContent = `${fileLabel} 可能已加密或受保护。请下载后使用 Office/WPS 输入密码打开，或上传解密后的文件。`;
+  section.append(message);
+  panel.append(section);
+}
+
+function isEncryptedText(value: string): boolean {
+  return /\b(password|encrypted|encrypt|protected|decrypt|permission|加密|密码|受保护)\b/i.test(value);
 }
 
 type ChartPreview = {

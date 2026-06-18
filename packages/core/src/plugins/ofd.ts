@@ -1,7 +1,8 @@
 import JSZip from "jszip";
 import { createObjectUrl, revokeObjectUrl } from "../dom";
-import type { PreviewPlugin } from "../types";
+import type { PreviewFile, PreviewPlugin } from "../types";
 import { createPanel, readArrayBuffer } from "./utils";
+import { createEncryptedFallback, isEncryptedError } from "./encrypted";
 
 export function ofdPlugin(): PreviewPlugin {
   return {
@@ -18,7 +19,7 @@ export function ofdPlugin(): PreviewPlugin {
       try {
         zip = await JSZip.loadAsync(await readArrayBuffer(ctx.file));
       } catch (error) {
-        panel.append(createOfdFallback(ctx.file.name, url, normalizeOfdError(error)));
+        panel.append(createOfdFailure(ctx.file, url, error));
         return {
           destroy() {
             panel.remove();
@@ -39,7 +40,7 @@ export function ofdPlugin(): PreviewPlugin {
           textFragments.push(...matches);
         }
       } catch (error) {
-        panel.append(createOfdFallback(ctx.file.name, url, normalizeOfdError(error)));
+        panel.append(createOfdFailure(ctx.file, url, error));
         return {
           destroy() {
             panel.remove();
@@ -823,6 +824,17 @@ function finiteNumber(value: string | null, fallback: number): number {
 
 function formatOfdCssNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function createOfdFailure(file: PreviewFile, url: string, error: unknown): HTMLElement {
+  if (isEncryptedError(error)) {
+    return createEncryptedFallback(file, url, {
+      title: "OFD 文件已加密，无法在线预览",
+      message: "请下载后使用本地 OFD 阅读器输入密码打开，或上传解密后的 OFD 文件。",
+      action: "下载 OFD"
+    });
+  }
+  return createOfdFallback(file.name, url, normalizeOfdError(error));
 }
 
 function createOfdFallback(fileName: string, url: string, detail: string): HTMLElement {
