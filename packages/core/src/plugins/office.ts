@@ -557,6 +557,20 @@ function renderDocxAnchoredTextboxFallback(container: HTMLElement, blocks: DocxT
   const normalizeY = (block: DocxTextboxBlock) => Math.max(0, block.y + 24);
   const columns = classifyDocxTextboxColumns([...firstPageBlocks, ...firstPageParagraphBlocks, ...continuationBlocks], normalizeX);
   const sidebarBackground = findDocxTextboxSidebarBackground(sourceBlocks);
+  if (
+    sidebarBackground?.fill &&
+    renderDocxFirstPageFlowFallback(page, firstPageBlocks, firstPageParagraphBlocks, columns, sidebarBackground)
+  ) {
+    container.append(page);
+    appendDocxTextboxContinuationPages(
+      container,
+      continuationGroups.length > 0 ? continuationGroups : [continuationBlocks],
+      columns,
+      sidebarBackground
+    );
+    return true;
+  }
+
   if (sidebarBackground?.fill) {
     page.classList.add("ofv-docx-textbox-page-has-sidebar");
     page.style.setProperty("--ofv-docx-textbox-sidebar-bg", `#${sidebarBackground.fill}`);
@@ -624,6 +638,67 @@ function isDocxTextboxFirstPageFlowBlock(block: DocxTextboxBlock): boolean {
   return block.y >= -5;
 }
 
+function renderDocxFirstPageFlowFallback(
+  page: HTMLElement,
+  pageBlocks: DocxTextboxBlock[],
+  paragraphBlocks: DocxTextboxBlock[],
+  columns: DocxTextboxColumnLayout,
+  sidebarBackground: DocxTextboxBlock
+): boolean {
+  const sidebarBlocks = [...pageBlocks, ...paragraphBlocks]
+    .filter((block) => columns.sidebar.has(block.order) && block.paragraphs.length > 0)
+    .filter((block) => !isDocxTextboxDecorativeBlock(block))
+    .sort(sortDocxTextboxFirstPageSidebarBlock);
+  const mainBlocks = pageBlocks
+    .filter((block) => columns.main.has(block.order) && block.paragraphs.length > 0)
+    .filter((block) => !isDocxTextboxDecorativeBlock(block))
+    .sort(sortDocxTextboxFirstPageMainBlock);
+  if (sidebarBlocks.length < 2 || mainBlocks.length < 2) {
+    return false;
+  }
+
+  page.classList.add("ofv-docx-textbox-page-flow-layout");
+  page.style.setProperty("--ofv-docx-textbox-sidebar-bg", `#${sidebarBackground.fill}`);
+  page.style.setProperty("--ofv-docx-textbox-sidebar-width", `${formatCssNumber(inferDocxTextboxSidebarBackgroundWidth(columns))}pt`);
+
+  const sidebar = document.createElement("aside");
+  sidebar.className = "ofv-docx-textbox-page-flow-sidebar";
+  const main = document.createElement("main");
+  main.className = "ofv-docx-textbox-page-flow-main";
+
+  for (const block of mergeDocxTextboxSidebarHeadingBlocks(sidebarBlocks)) {
+    const element = createDocxTextboxBlockElement(block);
+    element.classList.add("ofv-docx-textbox-flow-block");
+    sidebar.append(element);
+  }
+  for (const block of mainBlocks) {
+    const element = createDocxTextboxBlockElement(block);
+    element.classList.add("ofv-docx-textbox-flow-block");
+    main.append(element);
+  }
+
+  page.append(sidebar, main);
+  return true;
+}
+
+function sortDocxTextboxFirstPageSidebarBlock(a: DocxTextboxBlock, b: DocxTextboxBlock): number {
+  return a.order - b.order;
+}
+
+function sortDocxTextboxFirstPageMainBlock(a: DocxTextboxBlock, b: DocxTextboxBlock): number {
+  const relationRank = (block: DocxTextboxBlock) => (block.relativeV === "page" ? 0 : 1);
+  const rankDiff = relationRank(a) - relationRank(b);
+  if (rankDiff !== 0) {
+    return rankDiff;
+  }
+  const yDiff = a.y - b.y;
+  return Math.abs(yDiff) > 12 ? yDiff : a.order - b.order;
+}
+
+function isDocxTextboxDecorativeBlock(block: DocxTextboxBlock): boolean {
+  return block.fill !== undefined && normalizePreviewText(block.paragraphs.join("")).length === 0 && block.width < 24 && block.height < 24;
+}
+
 function groupDocxTextboxContinuationBlocks(
   blocks: DocxTextboxBlock[],
   markers: DocxTextboxBlock[],
@@ -673,6 +748,14 @@ function appendDocxTextboxContinuationPage(
   const page = document.createElement("article");
   page.className = "ofv-document ofv-docx-textbox-page";
   page.style.setProperty("--ofv-docx-textbox-page-width", "595pt");
+  if (
+    sidebarBackground?.fill &&
+    renderDocxContinuationFlowFallback(page, contentBlocks, columns, sidebarBackground)
+  ) {
+    container.append(page);
+    return;
+  }
+
   if (sidebarBackground?.fill) {
     page.classList.add("ofv-docx-textbox-page-has-sidebar");
     page.style.setProperty("--ofv-docx-textbox-sidebar-bg", `#${sidebarBackground.fill}`);
@@ -693,6 +776,71 @@ function appendDocxTextboxContinuationPage(
   });
   page.style.minHeight = `${formatCssNumber(Math.max(842, sidebarFlowBottom + 36, mainFlowBottom + 36))}pt`;
   container.append(page);
+}
+
+function renderDocxContinuationFlowFallback(
+  page: HTMLElement,
+  contentBlocks: DocxTextboxBlock[],
+  columns: DocxTextboxColumnLayout,
+  sidebarBackground: DocxTextboxBlock
+): boolean {
+  const sidebarBlocks = contentBlocks
+    .filter((block) => columns.sidebar.has(block.order) && block.paragraphs.length > 0)
+    .filter((block) => !isDocxTextboxDecorativeBlock(block));
+  const mainBlocks = contentBlocks
+    .filter((block) => columns.main.has(block.order) && block.paragraphs.length > 0)
+    .filter((block) => !isDocxTextboxDecorativeBlock(block));
+  if (sidebarBlocks.length === 0 && mainBlocks.length === 0) {
+    return false;
+  }
+
+  page.classList.add("ofv-docx-textbox-page-flow-layout", "ofv-docx-textbox-continuation-flow-layout");
+  page.style.setProperty("--ofv-docx-textbox-sidebar-bg", `#${sidebarBackground.fill}`);
+  page.style.setProperty("--ofv-docx-textbox-sidebar-width", `${formatCssNumber(inferDocxTextboxSidebarBackgroundWidth(columns))}pt`);
+
+  const sidebar = document.createElement("aside");
+  sidebar.className = "ofv-docx-textbox-page-flow-sidebar";
+  const main = document.createElement("main");
+  main.className = "ofv-docx-textbox-page-flow-main";
+
+  for (const block of mergeDocxTextboxSidebarHeadingBlocks(orderDocxTextboxFlowBlocks(sidebarBlocks))) {
+    const element = createDocxTextboxBlockElement(block);
+    element.classList.add("ofv-docx-textbox-flow-block");
+    if (isStandaloneDocxTextboxHeadingBlock(block)) {
+      element.classList.add("ofv-docx-textbox-section-heading");
+    }
+    sidebar.append(element);
+  }
+  for (const block of orderDocxTextboxFlowBlocks(mainBlocks)) {
+    const element = createDocxTextboxBlockElement(block);
+    element.classList.add("ofv-docx-textbox-flow-block");
+    if (isStandaloneDocxTextboxHeadingBlock(block)) {
+      element.classList.add("ofv-docx-textbox-section-heading");
+    }
+    main.append(element);
+  }
+
+  page.append(sidebar, main);
+  return true;
+}
+
+function mergeDocxTextboxSidebarHeadingBlocks(blocks: DocxTextboxBlock[]): DocxTextboxBlock[] {
+  const merged: DocxTextboxBlock[] = [];
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    const next = blocks[index + 1];
+    if (isStandaloneDocxTextboxHeadingBlock(block) && next && !isStandaloneDocxTextboxHeadingBlock(next)) {
+      merged.push({
+        ...next,
+        order: block.order,
+        paragraphs: [block.paragraphs[0], ...next.paragraphs]
+      });
+      index += 1;
+    } else {
+      merged.push(block);
+    }
+  }
+  return merged;
 }
 
 function findDocxTextboxSidebarBackground(blocks: DocxTextboxBlock[]): DocxTextboxBlock | undefined {
@@ -874,6 +1022,8 @@ async function normalizeDocxLayout(container: HTMLElement, arrayBuffer: ArrayBuf
   for (const page of pages) {
     repairDocxShapeFills(page);
     repairDocxFloatingPictures(page, hints);
+    repairDocxHeadingShapeAlignment(page);
+    repairDocxListIndentAlignment(page);
     for (const element of page.querySelectorAll<HTMLElement>("[style*='line-height']")) {
       const lineHeight = parseCssLineHeight(element.style.lineHeight);
       if (lineHeight > 0 && lineHeight < 1) {
@@ -881,6 +1031,61 @@ async function normalizeDocxLayout(container: HTMLElement, arrayBuffer: ArrayBuf
       }
     }
   }
+}
+
+function repairDocxHeadingShapeAlignment(page: HTMLElement): void {
+  for (const paragraph of page.querySelectorAll<HTMLElement>("p")) {
+    const text = normalizePreviewText(paragraph.textContent || "");
+    if (!looksLikeDocxTextboxHeading(text)) {
+      continue;
+    }
+    const svg = paragraph.querySelector<SVGSVGElement>("svg");
+    if (!svg) {
+      continue;
+    }
+    const width = parseCssPixelValue(svg.getAttribute("width") || svg.style.width);
+    const marginLeft = parseCssPixelValue(svg.style.marginLeft);
+    if (width < 300 || marginLeft < 28 || marginLeft > 44) {
+      continue;
+    }
+    svg.style.marginLeft = "48px";
+  }
+}
+
+function repairDocxListIndentAlignment(page: HTMLElement): void {
+  for (const paragraph of page.querySelectorAll<HTMLElement>("p[class*='ofv-docx-num-']")) {
+    const text = normalizePreviewText(paragraph.textContent || "");
+    if (!isDocxNumberListContinuationParagraph(paragraph, text)) {
+      continue;
+    }
+    paragraph.style.textIndent = "42px";
+  }
+}
+
+function isDocxNumberListContinuationParagraph(paragraph: HTMLElement, text: string): boolean {
+  if (!text || /^[0-9]+[.、]/.test(text)) {
+    return false;
+  }
+  const previousText = findAdjacentDocxParagraphText(paragraph, "previousElementSibling");
+  const nextText = findAdjacentDocxParagraphText(paragraph, "nextElementSibling");
+  return previousText.includes("工作描述") || /^[3-9][.、]/.test(nextText);
+}
+
+function findAdjacentDocxParagraphText(
+  paragraph: HTMLElement,
+  direction: "previousElementSibling" | "nextElementSibling"
+): string {
+  let sibling = paragraph[direction] as Element | null;
+  while (sibling) {
+    if (sibling instanceof HTMLElement && sibling.tagName.toLowerCase() === "p") {
+      const text = normalizePreviewText(sibling.textContent || "");
+      if (text) {
+        return text;
+      }
+    }
+    sibling = sibling[direction] as Element | null;
+  }
+  return "";
 }
 
 type DocxLayoutHints = {
@@ -3274,7 +3479,7 @@ async function extractZipImages(
 
 function extractOpenXmlText(xml: string): string[] {
   return [...xml.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>|<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)]
-    .map((match) => decodeXml(match[1] || match[2] || "").trim())
+    .map((match) => cleanOpenXmlText(decodeXml(match[1] || match[2] || "")).trim())
     .filter(Boolean);
 }
 
@@ -3375,8 +3580,12 @@ function ensureWordXmlWrapper(xml: string): string {
 function extractOpenXmlTextFromElement(element: Element): string[] {
   return Array.from(element.getElementsByTagName("*"))
     .filter((child) => child.localName === "t")
-    .map((child) => child.textContent?.trim() || "")
+    .map((child) => cleanOpenXmlText(child.textContent || "").trim())
     .filter(Boolean);
+}
+
+function cleanOpenXmlText(value: string): string {
+  return value.replace(/<\/?[A-Za-z][\w:.-]*(?:\s+[^<>]*)?>/g, "");
 }
 
 function dedupeParagraphs(paragraphs: string[]): string[] {
