@@ -7,6 +7,7 @@ export { pdfPlugin } from "./plugins/pdf";
 export { epubPlugin } from "./plugins/epub";
 export { xpsPlugin } from "./plugins/xps";
 export { officePlugin } from "./plugins/office";
+export type { OfficeConversionContext, OfficeConversionResult, OfficePluginOptions } from "./plugins/office";
 export { ofdPlugin } from "./plugins/ofd";
 export { archivePlugin } from "./plugins/archive";
 export { emailPlugin } from "./plugins/email";

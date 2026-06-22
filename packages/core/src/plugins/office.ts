@@ -1,8 +1,9 @@
 import JSZip from "jszip";
 import DOMPurify from "dompurify";
 import type { WorkBook } from "xlsx";
-import type { PreviewCommand, PreviewContext, PreviewPlugin } from "../types";
+import type { PreviewCommand, PreviewContext, PreviewInstance, PreviewPlugin } from "../types";
 import { createPanel, createSection, decodeTextBuffer, readArrayBuffer, resolveFormat } from "./utils";
+import { renderPdfDocumentPreview, type PdfPluginOptions } from "./pdf";
 
 const wordExtensions = new Set(["docx", "docm", "doc", "dotx", "dotm", "dot", "rtf", "odt", "fodt", "wps"]);
 const sheetExtensions = new Set(["xlsx", "xls", "xlsm", "xlsb", "xlt", "xltx", "xltm", "csv", "tsv", "ods", "fods", "numbers", "et"]);
@@ -107,7 +108,41 @@ type IWorkMetadata = {
   modified?: string;
 };
 
-export function officePlugin(): PreviewPlugin {
+export interface OfficeConversionContext {
+  file: PreviewContext["file"];
+  arrayBuffer: ArrayBuffer;
+  extension: string;
+  detectedFormat?: "docx" | "xlsx" | "pptx";
+  reason: "complex-docx" | "legacy-office" | "manual";
+}
+
+export type OfficeConversionResult =
+  | Blob
+  | ArrayBuffer
+  | string
+  | {
+      blob?: Blob;
+      data?: Blob | ArrayBuffer;
+      url?: string;
+      fileName?: string;
+      mimeType?: string;
+    };
+
+export interface OfficePluginOptions {
+  convert?: (ctx: OfficeConversionContext) => Promise<OfficeConversionResult | null | undefined> | OfficeConversionResult | null | undefined;
+  preferConversion?: boolean | ((ctx: OfficeConversionContext) => boolean | Promise<boolean>);
+  pdf?: PdfPluginOptions;
+}
+
+type NormalizedOfficeConversion = {
+  fileName: string;
+  fileUrl: string;
+  fileSize?: number;
+  mimeType: string;
+  revokeUrlOnDestroy: boolean;
+};
+
+export function officePlugin(options: OfficePluginOptions = {}): PreviewPlugin {
   return {
     name: "office",
     match(file) {
@@ -125,8 +160,12 @@ export function officePlugin(): PreviewPlugin {
       const arrayBuffer = await readArrayBuffer(ctx.file);
       const packageFormat = shouldSniffPackagedOffice(extension) ? await detectPackagedOfficeFormat(arrayBuffer) : undefined;
       let disposeDocxFit: (() => void) | undefined;
+      let delegatedInstance: PreviewInstance | undefined;
 
-      if (packageFormat === "docx" && !fileIsDocx(extension)) {
+      const conversionContext = await createOfficeConversionContext(ctx, arrayBuffer, extension, packageFormat);
+      if (conversionContext && (await shouldUseOfficeConversion(options, conversionContext))) {
+        delegatedInstance = await renderConvertedOfficePreview(panel, ctx, options, conversionContext);
+      } else if (packageFormat === "docx" && !fileIsDocx(extension)) {
         disposeDocxFit = await renderDocx(panel, arrayBuffer);
       } else if (packageFormat === "xlsx" && !sheetExtensions.has(extension)) {
         await renderSheet(panel, arrayBuffer, "xlsx");
@@ -157,17 +196,19 @@ export function officePlugin(): PreviewPlugin {
       } else {
         renderUnsupportedOffice(panel, extension || ctx.file.extension || "office");
       }
+
       const controller = createOfficeZoomController(panel, ctx);
       ctx.toolbar?.refreshCommandSupport();
 
       return {
         canCommand(command) {
-          return controller?.canCommand(command) ?? false;
+          return delegatedInstance?.canCommand?.(command) || controller?.canCommand(command) || false;
         },
         command(command) {
-          return controller?.command(command) ?? false;
+          return delegatedInstance?.command?.(command) || controller?.command(command) || false;
         },
         destroy() {
+          delegatedInstance?.destroy();
           controller?.destroy();
           disposeDocxFit?.();
           panel.remove();
@@ -175,6 +216,123 @@ export function officePlugin(): PreviewPlugin {
       };
     }
   };
+}
+
+async function createOfficeConversionContext(
+  ctx: PreviewContext,
+  arrayBuffer: ArrayBuffer,
+  extension: string,
+  detectedFormat?: "docx" | "xlsx" | "pptx"
+): Promise<OfficeConversionContext | undefined> {
+  const effectiveFormat = detectedFormat || extension;
+  if ((effectiveFormat === "docx" || fileIsDocx(extension)) && (await docxShouldPreferTextboxLayoutFallback(arrayBuffer))) {
+    return { file: ctx.file, arrayBuffer, extension, detectedFormat, reason: "complex-docx" };
+  }
+  if (isLegacyOfficeBinary(extension)) {
+    return { file: ctx.file, arrayBuffer, extension, detectedFormat, reason: "legacy-office" };
+  }
+  return undefined;
+}
+
+async function shouldUseOfficeConversion(options: OfficePluginOptions, context: OfficeConversionContext): Promise<boolean> {
+  if (!options.convert) {
+    return false;
+  }
+  if (typeof options.preferConversion === "function") {
+    return Boolean(await options.preferConversion(context));
+  }
+  if (options.preferConversion !== undefined) {
+    return options.preferConversion;
+  }
+  return context.reason === "complex-docx" || context.reason === "legacy-office";
+}
+
+async function renderConvertedOfficePreview(
+  panel: HTMLElement,
+  ctx: PreviewContext,
+  options: OfficePluginOptions,
+  conversionContext: OfficeConversionContext
+): Promise<PreviewInstance> {
+  if (!options.convert) {
+    throw new Error("Office conversion handler is not configured.");
+  }
+  const converted = normalizeOfficeConversionResult(await options.convert(conversionContext), ctx.file.name);
+  if (!converted) {
+    throw new Error("Office conversion handler did not return a previewable file.");
+  }
+  if (converted.mimeType !== "application/pdf" && !converted.fileName.toLowerCase().endsWith(".pdf")) {
+    throw new Error("Office conversion handler must return a PDF Blob, ArrayBuffer or URL.");
+  }
+  return renderPdfDocumentPreview({
+    ...(options.pdf || {}),
+    fileName: converted.fileName,
+    fileUrl: converted.fileUrl,
+    fileSize: converted.fileSize,
+    isExternal: !converted.revokeUrlOnDestroy,
+    viewport: panel,
+    size: ctx.size,
+    fit: ctx.options.fit,
+    toolbar: ctx.toolbar,
+    title: "Office 高保真转换预览",
+    fallbackTitle: "Office 转换后的 PDF 无法预览",
+    revokeUrlOnDestroy: converted.revokeUrlOnDestroy
+  });
+}
+
+function normalizeOfficeConversionResult(
+  result: OfficeConversionResult | null | undefined,
+  sourceFileName: string
+): NormalizedOfficeConversion | undefined {
+  if (!result) {
+    return undefined;
+  }
+  const fallbackFileName = `${stripFileExtension(sourceFileName) || "office-preview"}.pdf`;
+  if (typeof result === "string") {
+    return {
+      fileName: fallbackFileName,
+      fileUrl: result,
+      mimeType: "application/pdf",
+      revokeUrlOnDestroy: false
+    };
+  }
+  if (result instanceof ArrayBuffer) {
+    const blob = new Blob([result], { type: "application/pdf" });
+    return createConvertedOfficeBlobPreview(blob, fallbackFileName);
+  }
+  if (result instanceof Blob) {
+    return createConvertedOfficeBlobPreview(result, fallbackFileName);
+  }
+  if (result.url) {
+    return {
+      fileName: result.fileName || fallbackFileName,
+      fileUrl: result.url,
+      mimeType: result.mimeType || "application/pdf",
+      revokeUrlOnDestroy: false
+    };
+  }
+  const data = result.blob || result.data;
+  if (data instanceof ArrayBuffer) {
+    const blob = new Blob([data], { type: result.mimeType || "application/pdf" });
+    return createConvertedOfficeBlobPreview(blob, result.fileName || fallbackFileName);
+  }
+  if (data instanceof Blob) {
+    return createConvertedOfficeBlobPreview(data, result.fileName || fallbackFileName);
+  }
+  return undefined;
+}
+
+function createConvertedOfficeBlobPreview(blob: Blob, fileName: string): NormalizedOfficeConversion {
+  return {
+    fileName,
+    fileUrl: URL.createObjectURL(blob),
+    fileSize: blob.size,
+    mimeType: blob.type || "application/pdf",
+    revokeUrlOnDestroy: true
+  };
+}
+
+function stripFileExtension(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, "");
 }
 
 function createOfficeZoomController(
@@ -288,7 +446,9 @@ async function renderDocx(panel: HTMLElement, arrayBuffer: ArrayBuffer): Promise
     });
     await normalizeDocxLayout(content, arrayBuffer);
     const shouldUseTextboxFallback =
-      await docxPreviewLooksBlank(content, arrayBuffer) || (await docxPreviewMissesRichTextboxContent(content, arrayBuffer));
+      (await docxPreviewLooksBlank(content, arrayBuffer)) ||
+      (await docxPreviewMissesRichTextboxContent(content, arrayBuffer)) ||
+      (await docxShouldPreferTextboxLayoutFallback(arrayBuffer));
     if (shouldUseTextboxFallback) {
       disposeFit?.();
       styleContainer.remove();
@@ -377,6 +537,35 @@ async function docxHasRichTextboxContent(arrayBuffer: ArrayBuffer): Promise<bool
       (textboxCount >= 3 || textboxParagraphs.length >= 3 || textboxTextLength >= 160) &&
       textboxTextLength >= 8 &&
       textboxTextLength >= documentTextLength * 0.4
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function docxShouldPreferTextboxLayoutFallback(arrayBuffer: ArrayBuffer): Promise<boolean> {
+  try {
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const documentXml = await zip.file("word/document.xml")?.async("text");
+    if (!documentXml || !/\btxbxContent\b/.test(documentXml)) {
+      return false;
+    }
+    const blocks = extractDocxTextboxBlocks(documentXml);
+    const meaningfulBlocks = blocks.filter((block) => block.paragraphs.length > 0);
+    const sidebarBackgrounds = blocks.filter(
+      (block) => block.paragraphs.length === 0 && block.fill && block.relativeV === "page" && block.x < 0 && block.width >= 120 && block.height >= 500
+    );
+    const pageAnchoredTextboxes = meaningfulBlocks.filter((block) => block.relativeV === "page");
+    const paragraphAnchoredTextboxes = meaningfulBlocks.filter((block) => block.relativeV !== "page");
+    const leftTextboxes = meaningfulBlocks.filter((block) => block.x < 0);
+    const rightTextboxes = meaningfulBlocks.filter((block) => block.x >= 80);
+    return (
+      sidebarBackgrounds.length >= 2 &&
+      meaningfulBlocks.length >= 8 &&
+      pageAnchoredTextboxes.length >= 4 &&
+      paragraphAnchoredTextboxes.length >= 2 &&
+      leftTextboxes.length >= 3 &&
+      rightTextboxes.length >= 3
     );
   } catch {
     return false;
@@ -979,6 +1168,10 @@ function createDocxTextboxBlockElement(block: DocxTextboxBlock): HTMLElement {
   const paragraphs = normalizeDocxTextboxParagraphOrder(block);
   const [first, ...rest] = paragraphs;
   if (first) {
+    const sectionKind = getDocxTextboxSectionKind(first);
+    if (sectionKind) {
+      section.classList.add(`ofv-docx-textbox-section-${sectionKind}`);
+    }
     const heading = document.createElement("h3");
     heading.textContent = first;
     section.append(heading);
@@ -990,6 +1183,29 @@ function createDocxTextboxBlockElement(block: DocxTextboxBlock): HTMLElement {
     section.append(paragraph);
   }
   return section;
+}
+
+function getDocxTextboxSectionKind(heading: string): string {
+  const text = normalizePreviewText(heading);
+  if (text.includes("教育背景")) {
+    return "education";
+  }
+  if (text.includes("专业技能")) {
+    return "skills";
+  }
+  if (text.includes("工作经历")) {
+    return "work";
+  }
+  if (text.includes("项目经验")) {
+    return "projects";
+  }
+  if (text.includes("自我评价")) {
+    return "summary";
+  }
+  if (text.includes("基本信息")) {
+    return "profile";
+  }
+  return "";
 }
 
 function estimateDocxTextboxBlockHeight(block: DocxTextboxBlock): number {

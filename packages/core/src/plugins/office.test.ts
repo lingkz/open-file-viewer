@@ -779,6 +779,72 @@ describe("officePlugin", () => {
     expect(container.querySelector(".ofv-document")).toBeNull();
   });
 
+  it("prefers textbox layout fallback for multi-page anchored resume templates", async () => {
+    const container = document.createElement("div");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const callsBefore = renderDocxAsync.mock.calls.length;
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: await createAnchoredResumeDocx(),
+      fileName: "anchored-resume.docx",
+      plugins: [officePlugin()]
+    });
+
+    await waitFor(() => container.textContent?.includes("项目经验") || false, 5000);
+
+    const pages = Array.from(container.querySelectorAll<HTMLElement>(".ofv-docx-textbox-page"));
+    expect(renderDocxAsync).toHaveBeenCalledTimes(callsBefore + 1);
+    expect(container.querySelector(".ofv-docx-wrapper")).toBeNull();
+    expect(container.querySelector(".ofv-docx-fallback-note")?.getAttribute("aria-hidden")).toBe("true");
+    expect(pages.length).toBeGreaterThanOrEqual(2);
+    expect(pages[0].textContent).toContain("教育背景");
+    expect(pages[0].textContent).toContain("专业技能");
+    expect(pages[1].textContent).toContain("自我评价");
+    expect(pages[1].textContent).toContain("项目经验");
+  });
+
+  it("can delegate complex anchored DOCX templates to an Office conversion service", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const container = document.createElement("div");
+    vi.spyOn(container, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 800,
+      bottom: 600,
+      width: 800,
+      height: 600,
+      toJSON: () => ({})
+    } as DOMRect);
+    const pdfjs = createPdfJsMock();
+    const convert = vi.fn(() => new Blob(["%PDF"], { type: "application/pdf" }));
+    document.body.append(container);
+
+    createViewer({
+      container,
+      file: await createAnchoredResumeDocx(),
+      fileName: "anchored-resume.docx",
+      plugins: [officePlugin({ convert, pdf: { pdfjs } })]
+    });
+
+    await waitFor(() => container.querySelectorAll("canvas.ofv-pdf-page").length === 1, 5000);
+
+    expect(convert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extension: "docx",
+        reason: "complex-docx",
+        file: expect.objectContaining({ name: "anchored-resume.docx" })
+      })
+    );
+    expect(container.querySelector(".ofv-pdf-viewer-title")?.textContent).toBe("Office 高保真转换预览");
+    expect(container.querySelector(".ofv-docx-textbox-page")).toBeNull();
+    expect(pdfjs.getDocument).toHaveBeenCalled();
+  });
+
   it("falls back when the high fidelity DOCX renderer misses rich textbox content", async () => {
     const container = document.createElement("div");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -1334,6 +1400,109 @@ async function createTextboxDocx(...texts: string[]): Promise<Blob> {
     type: "blob",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   });
+}
+
+async function createAnchoredResumeDocx(): Promise<Blob> {
+  const zip = new JSZip();
+  const anchor = (options: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    relativeV?: "page" | "paragraph";
+    fill?: string;
+    paragraphs?: string[];
+  }) => {
+    const text = options.paragraphs
+      ?.map((paragraph) => `<w:p><w:r><w:t>${paragraph}</w:t></w:r></w:p>`)
+      .join("");
+    return `
+      <w:p>
+        <w:r>
+          <w:drawing>
+            <wp:anchor>
+              <wp:positionH relativeFrom="column"><wp:posOffset>${ptToEmu(options.x)}</wp:posOffset></wp:positionH>
+              <wp:positionV relativeFrom="${options.relativeV || "page"}"><wp:posOffset>${ptToEmu(options.y)}</wp:posOffset></wp:positionV>
+              <wp:extent cx="${ptToEmu(options.width)}" cy="${ptToEmu(options.height)}"/>
+              <a:graphic>
+                <a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+                  <wps:wsp>
+                    <wps:spPr>
+                      <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                      ${options.fill ? `<a:solidFill><a:srgbClr val="${options.fill}"/></a:solidFill>` : "<a:noFill/>"}
+                    </wps:spPr>
+                    ${
+                      text
+                        ? `<wps:txbx><w:txbxContent>${text}</w:txbxContent></wps:txbx>`
+                        : ""
+                    }
+                  </wps:wsp>
+                </a:graphicData>
+              </a:graphic>
+            </wp:anchor>
+          </w:drawing>
+        </w:r>
+      </w:p>`;
+  };
+  zip.file(
+    "word/document.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <w:document
+        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">
+        <w:body>
+          ${anchor({ x: -92, y: -10, width: 189, height: 898, relativeV: "page", fill: "1F1C34" })}
+          ${anchor({ x: -72, y: 31, width: 149, height: 72, relativeV: "page", paragraphs: ["徐善培", "求职意向：Web前端工程师"] })}
+          ${anchor({ x: -72, y: 179, width: 166, height: 180, relativeV: "page", fill: "1F1C34", paragraphs: ["基本信息", "1995.03", "195-3139-0706", "江苏 南京"] })}
+          ${anchor({ x: 108, y: 35, width: 394, height: 71, relativeV: "page", fill: "303241", paragraphs: ["教育背景", "2012.09-2016.07 北京北大资源学院 本科"] })}
+          ${anchor({ x: 106, y: 124, width: 389, height: 496, relativeV: "page", paragraphs: ["专业技能", "精通HTML/CSS等Web前端相关技术；", "熟练使用Vue2/3 + Vue-Router + Vuex/Pinia"] })}
+          ${anchor({ x: -77, y: 412, width: 166, height: 124, relativeV: "page", paragraphs: ["主修课程", "C语言、数据结构、操作系统"] })}
+          ${anchor({ x: -70, y: 8, width: 158, height: 38, relativeV: "paragraph", paragraphs: ["业余成果"] })}
+          ${anchor({ x: -72, y: 15, width: 165, height: 109, relativeV: "paragraph", paragraphs: ["公众号：前端开发爱好者 作者"] })}
+          ${anchor({ x: 112, y: 644, width: 371, height: 149, relativeV: "page", fill: "303241", paragraphs: ["工作经历", "2018.03-2021.01 海云数据(南京分公司) 前端开发"] })}
+          ${anchor({ x: -90, y: -56, width: 189, height: 898, relativeV: "page", fill: "1F1C34" })}
+          ${anchor({ x: -74, y: -160, width: 158, height: 257, relativeV: "paragraph", paragraphs: ["本人追求上进，善于学习和运用新技术，了解并不断接受新的技术。"] })}
+          ${anchor({ x: -74, y: -192, width: 145, height: 32, relativeV: "paragraph", paragraphs: ["自我评价"] })}
+          ${anchor({ x: 116, y: -41, width: 365, height: 757, relativeV: "paragraph", paragraphs: ["项目经验", "2018.03-2021.01 海云数据( 南京分公司 )", "项目一：辽宁智案研判"] })}
+        </w:body>
+      </w:document>`
+  );
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  });
+}
+
+function ptToEmu(value: number): number {
+  return Math.round(value * 12700);
+}
+
+function createPdfJsMock(): any {
+  const page = {
+    getViewport: vi.fn(({ scale }: { scale: number }) => ({
+      width: 400 * scale,
+      height: 600 * scale,
+      transform: [scale, 0, 0, scale, 0, 0]
+    })),
+    render: vi.fn(() => ({
+      promise: Promise.resolve(),
+      cancel: vi.fn()
+    })),
+    getTextContent: vi.fn(() => Promise.resolve({ items: [] }))
+  };
+  return {
+    version: "4.0.0-test",
+    GlobalWorkerOptions: { workerSrc: "" },
+    getDocument: vi.fn(() => ({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: vi.fn(() => Promise.resolve(page)),
+        destroy: vi.fn()
+      })
+    }))
+  };
 }
 
 async function createFloatingShapeDocx(): Promise<Blob> {

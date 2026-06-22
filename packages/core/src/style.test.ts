@@ -55,12 +55,24 @@ describe("core responsive styles", () => {
     expect(rule(".ofv-office")).toContain("--ofv-office-zoom: 1");
     expect(rule(".ofv-docx-page-frame")).toContain("max-width: 100%");
     expect(rule(".ofv-docx-page-frame")).toContain("overflow: visible");
+    expect(rule(".ofv-docx-textbox-page-flow-layout")).toContain("min-height: 0");
+    expect(rule(".ofv-docx-textbox-page-flow-layout")).not.toContain("842pt");
+    expect(rule(".ofv-docx-textbox-continuation-flow-layout .ofv-docx-textbox-page-flow-main")).toContain(
+      "justify-content: flex-start"
+    );
+    expect(rule(".ofv-docx-textbox-continuation-flow-layout .ofv-docx-textbox-page-flow-main")).not.toContain(
+      "space-between"
+    );
     expect(docxSection).toContain("max-width: none");
     expect(docxSection).toContain("background: #fff");
     expect(docxSection).toContain("overflow: visible");
     expect(docxSection).toContain("overflow-wrap: normal");
     expect(docxSection).toContain("transform: scale(calc(var(--ofv-docx-scale) * var(--ofv-office-zoom, 1)))");
     expect(docxSection).toContain("transform-origin: top left");
+    expect(rule(".ofv-docx-textbox-page-flow-main .ofv-docx-textbox-block h3::before")).toContain(
+      "clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%)"
+    );
+    expect(rule(".ofv-docx-textbox-page-flow-main .ofv-docx-textbox-block h3::before")).toContain("width: 15px");
     expect(
       rule(
         ".ofv-docx-document section.ofv-docx > section,\n.ofv-docx-document section.ofv-docx .docx,\n.ofv-docx-document section.ofv-docx .docx-wrapper"

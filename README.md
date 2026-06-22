@@ -299,6 +299,42 @@ const plugins = [
 
 复杂格式的预览质量会受浏览器能力、文件结构和依赖解析器影响。当前版本优先保证所有格式都在容器内走可控预览路径；高保真 Office、CAD、设计稿和专有二进制格式可以继续接入专用引擎或服务端转换。
 
+### 高保真 Office 转 PDF
+
+浏览器端 DOCX/PPTX/XLSX 解析无法完全复刻 Word/WPS 的排版引擎。带有文本框、绝对定位、复杂字体、页眉页脚或旧版二进制格式的 Office 文件，建议在业务服务端用 LibreOffice、OnlyOffice 或 Microsoft Graph 转成 PDF，再交给内置 PDF 预览渲染。
+
+`officePlugin` 提供可选的 `convert` 钩子。默认不会上传文件；只有业务显式配置这个钩子时，复杂 DOCX 和旧版 Office 才会走转换链路：
+
+```ts
+officePlugin({
+  pdf: {
+    workerSrc: pdfWorkerSrc
+  },
+  async convert({ file, arrayBuffer, reason }) {
+    const form = new FormData();
+    form.append("file", new Blob([arrayBuffer]), file.name);
+    form.append("reason", reason);
+
+    const response = await fetch("/api/office/convert-to-pdf", {
+      method: "POST",
+      body: form
+    });
+
+    if (!response.ok) {
+      throw new Error("Office 转 PDF 失败");
+    }
+
+    return {
+      blob: await response.blob(),
+      fileName: file.name.replace(/\.[^.]+$/, ".pdf"),
+      mimeType: "application/pdf"
+    };
+  }
+});
+```
+
+`reason` 目前会标记为 `complex-docx` 或 `legacy-office`。如果转换接口返回的是可访问的 PDF URL，也可以直接 `return { url, fileName: "preview.pdf", mimeType: "application/pdf" }`。
+
 视频预览中，MP4、WebM、MOV 等浏览器原生格式不需要额外依赖；HLS 由内置的 `hls.js` 处理；FLV 和 MPEG-TS/M2TS 属于可选增强能力，需要业务项目自行安装 `mpegts.js`。未安装时会展示下载 fallback，避免安装 `@open-file-viewer/core` 时被 `mpegts.js` 的 git 子依赖影响。
 
 如果业务确实需要 FLV/M2TS，并且 pnpm 11 开启了 `blockExoticSubdeps`，可以在业务项目中覆盖 `mpegts.js` 的传递依赖：

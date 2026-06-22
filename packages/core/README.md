@@ -123,6 +123,44 @@ pdfPlugin({
 This keeps compatibility at the cost of holding one extra copy of the PDF in memory, so use it only
 for affected environments.
 
+## High-Fidelity Office Conversion
+
+Browser-side Office renderers cannot perfectly reproduce Word/WPS layout for files with anchored
+textboxes, absolute positioning, custom fonts, headers/footers or legacy binary formats. For those
+files, configure `officePlugin({ convert })` to send the file to your own LibreOffice, OnlyOffice or
+Microsoft Graph conversion service and return a PDF. The converted PDF is rendered by the built-in
+PDF viewer.
+
+```ts
+officePlugin({
+  pdf: { workerSrc: pdfWorkerSrc },
+  async convert({ file, arrayBuffer, reason }) {
+    const form = new FormData();
+    form.append("file", new Blob([arrayBuffer]), file.name);
+    form.append("reason", reason);
+
+    const response = await fetch("/api/office/convert-to-pdf", {
+      method: "POST",
+      body: form
+    });
+
+    if (!response.ok) {
+      throw new Error("Office conversion failed");
+    }
+
+    return {
+      blob: await response.blob(),
+      fileName: file.name.replace(/\.[^.]+$/, ".pdf"),
+      mimeType: "application/pdf"
+    };
+  }
+});
+```
+
+Open File Viewer does not upload files by default. The conversion hook is only called when you
+explicitly configure it, and currently targets `complex-docx` and `legacy-office` cases. You can also
+return `{ url, fileName, mimeType: "application/pdf" }` when your service stores the converted PDF.
+
 ## CAD Customization
 
 `cadPlugin()` has two CAD preview layers:
