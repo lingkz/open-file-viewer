@@ -2910,6 +2910,76 @@ function normalizePptxLayout(container: HTMLElement): void {
   for (const slide of slideCanvases) {
     slide.style.backgroundColor = "#FFFFFF";
   }
+  normalizePptxMirroredText(container);
+}
+
+function normalizePptxMirroredText(container: HTMLElement): void {
+  const mirroredContainers = Array.from(container.querySelectorAll<HTMLElement>("div")).filter((element) => {
+    const text = element.textContent?.trim();
+    if (!text || element.children.length === 0) {
+      return false;
+    }
+    const styleTransform = element.style.transform;
+    return hasPptxMirrorTransform(styleTransform, "x") || hasPptxMirrorTransform(styleTransform, "y");
+  });
+
+  for (const element of mirroredContainers) {
+    const flipX = hasPptxMirrorTransform(element.style.transform, "x");
+    const flipY = hasPptxMirrorTransform(element.style.transform, "y");
+    const targets = findPptxMirroredTextTargets(element);
+
+    for (const target of targets) {
+      counterMirrorPptxTextTarget(target, flipX, flipY);
+    }
+  }
+}
+
+function findPptxMirroredTextTargets(element: HTMLElement): HTMLElement[] {
+  const children = Array.from(element.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
+  const absoluteTextChildren = children.filter((child) => Boolean(child.textContent?.trim()) && child.style.position === "absolute");
+  if (absoluteTextChildren.length > 0) {
+    return absoluteTextChildren;
+  }
+  return children.filter((child) => Boolean(child.textContent?.trim()));
+}
+
+function hasPptxMirrorTransform(transform: string, axis: "x" | "y"): boolean {
+  if (!transform) {
+    return false;
+  }
+  if (axis === "x" && /scaleX\(\s*-1\s*\)/i.test(transform)) {
+    return true;
+  }
+  if (axis === "y" && /scaleY\(\s*-1\s*\)/i.test(transform)) {
+    return true;
+  }
+  const matrix = transform.match(/matrix\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*,\s*([^,\s]+)\s*,\s*([^,\s]+)/i);
+  if (!matrix) {
+    return false;
+  }
+  const xScale = Number(matrix[1]);
+  const yScale = Number(matrix[4]);
+  return axis === "x" ? xScale < 0 : yScale < 0;
+}
+
+function counterMirrorPptxTextTarget(target: HTMLElement, flipX: boolean, flipY: boolean): void {
+  const applied = target.dataset.ofvPptxCounterMirror ?? "";
+  const transforms: string[] = [];
+  if (flipX && !applied.includes("x")) {
+    transforms.push("scaleX(-1)");
+  }
+  if (flipY && !applied.includes("y")) {
+    transforms.push("scaleY(-1)");
+  }
+  if (transforms.length === 0) {
+    return;
+  }
+
+  target.style.transform = `${target.style.transform || ""} ${transforms.join(" ")}`.trim();
+  if (!target.style.transformOrigin) {
+    target.style.transformOrigin = "center center";
+  }
+  target.dataset.ofvPptxCounterMirror = `${applied}${flipX ? "x" : ""}${flipY ? "y" : ""}`;
 }
 
 function findPptxSlideCanvases(container: HTMLElement): HTMLElement[] {

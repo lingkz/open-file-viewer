@@ -57,6 +57,20 @@ const openPptx = vi.hoisted(() =>
     page.style.transform = "scale(0.75)";
     page.textContent = "PPTX rendered";
     page.style.backgroundColor = "transparent";
+    const mirroredTextGroup = document.createElement("div");
+    mirroredTextGroup.className = "pptx-mirrored-text-group";
+    mirroredTextGroup.style.position = "absolute";
+    mirroredTextGroup.style.left = "800px";
+    mirroredTextGroup.style.top = "120px";
+    mirroredTextGroup.style.width = "300px";
+    mirroredTextGroup.style.height = "120px";
+    mirroredTextGroup.style.transform = "scaleX(-1)";
+    const title = document.createElement("div");
+    title.textContent = "Mirrored title";
+    const body = document.createElement("div");
+    body.textContent = "Mirrored body";
+    mirroredTextGroup.append(title, body);
+    page.append(mirroredTextGroup);
     viewport.append(page);
     wrapper.append(viewport);
     container.append(wrapper);
@@ -1033,6 +1047,8 @@ describe("officePlugin", () => {
     expect(container.querySelector(".ofv-pptx-viewer")?.textContent).toContain("PPTX rendered");
     expect(visibleText(container)).not.toContain("PPTX 演示文稿结构");
     expect(container.querySelector<HTMLElement>(".pptx-rendered")?.style.backgroundColor).toBe("rgb(255, 255, 255)");
+    expect(container.querySelector<HTMLElement>(".pptx-mirrored-text-group > div")?.style.transform).toBe("scaleX(-1)");
+    expect(container.querySelector<HTMLElement>(".pptx-mirrored-text-group > div")?.dataset.ofvPptxCounterMirror).toBe("x");
   });
 
   it("responds to shared toolbar zoom for PPTX previews", async () => {
